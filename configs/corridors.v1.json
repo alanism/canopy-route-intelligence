@@ -1,0 +1,836 @@
+{
+  "version": "1",
+  "default_corridor": {
+    "key": "DEFAULT",
+    "origin": "US",
+    "destination": "XX",
+    "label": "Directional corridor",
+    "corridor_slug": "directional-corridor",
+    "source_country": "US",
+    "destination_country": "XX",
+    "destination_city": "Unknown",
+    "map_viewport": {
+      "lat": 0,
+      "lon": 0,
+      "zoom": 1.5,
+      "bearing": 0,
+      "pitch": 0
+    },
+    "corridor_note": "Cross-border USDC transfer.",
+    "default_amount_usdc": 50000,
+    "default_monthly_volume_usdc": 1000000,
+    "default_baseline_fee_pct": 1.5,
+    "default_baseline_settlement_hours": 36,
+    "default_current_setup": "Current payout stack",
+    "polygon_maturity": "Medium",
+    "stellar_maturity": "Medium",
+    "market_readiness": "Directional",
+    "ecosystem_support": "Directional",
+    "regulatory_exposure": "Unknown",
+    "launch_readiness": "Directional only",
+    "launch_readiness_score": 0.5,
+    "rail_route_fit": {
+      "Polygon": 0.65,
+      "Ethereum": 0.65,
+      "Stellar": 0.55
+    },
+    "solved_infrastructure": [
+      "Use this scenario for directional evaluation rather than corridor-specific claims."
+    ],
+    "open_questions": [
+      "Corridor-specific counterparty, regulatory, and payout details need validation."
+    ],
+    "analytics_profile": {
+      "weekly_multiplier": 6.5,
+      "concentration_risk": 0.35,
+      "whale_bias": 0.2,
+      "rails": {
+        "Polygon": {
+          "share": 0.04,
+          "bridge_share": 0.3,
+          "sender_ratio": 0.4,
+          "receiver_ratio": 0.34,
+          "depth_multiplier": 1.0
+        },
+        "Ethereum": {
+          "share": 0.03,
+          "bridge_share": 0.08,
+          "sender_ratio": 0.33,
+          "receiver_ratio": 0.3,
+          "depth_multiplier": 0.82
+        },
+        "Stellar": {
+          "share": 0.012,
+          "bridge_share": 0.03,
+          "sender_ratio": 0.24,
+          "receiver_ratio": 0.23,
+          "depth_multiplier": 0.56
+        }
+      }
+    },
+    "stellar_reference": {
+      "maturity": "Medium",
+      "liquidity_proxy": "Strategic comparator only; corridor-specific liquidity still needs diligence.",
+      "settlement": "Approx. 5s ledger close; current Canopy view treats Stellar as batch analytics / reference.",
+      "confidence": 0.5,
+      "note": "Use as a strategic comparator, not a live operational recommendation yet."
+    }
+  },
+  "default_analytics_profile": {
+    "weekly_multiplier": 6.5,
+    "concentration_risk": 0.35,
+    "whale_bias": 0.2,
+    "rails": {
+      "Polygon": {
+        "share": 0.04,
+        "bridge_share": 0.3,
+        "sender_ratio": 0.4,
+        "receiver_ratio": 0.34,
+        "depth_multiplier": 1.0
+      },
+      "Ethereum": {
+        "share": 0.03,
+        "bridge_share": 0.08,
+        "sender_ratio": 0.33,
+        "receiver_ratio": 0.3,
+        "depth_multiplier": 0.82
+      },
+      "Stellar": {
+        "share": 0.012,
+        "bridge_share": 0.03,
+        "sender_ratio": 0.24,
+        "receiver_ratio": 0.23,
+        "depth_multiplier": 0.56
+      }
+    }
+  },
+  "default_stellar_reference": {
+    "maturity": "Medium",
+    "liquidity_proxy": "Strategic comparator only; corridor-specific liquidity still needs diligence.",
+    "settlement": "Approx. 5s ledger close; current Canopy view treats Stellar as batch analytics / reference.",
+    "confidence": 0.5,
+    "note": "Use as a strategic comparator, not a live operational recommendation yet."
+  },
+  "corridors": [
+    {
+      "key": "US-MX",
+      "origin": "US",
+      "destination": "MX",
+      "label": "US -> Mexico",
+      "corridor_slug": "us-mexico",
+      "source_country": "US",
+      "destination_country": "Mexico",
+      "destination_city": "Mexico City",
+      "map_viewport": {
+        "lat": 19.432608,
+        "lon": -99.133209,
+        "zoom": 10.9,
+        "bearing": -6,
+        "pitch": 0
+      },
+      "corridor_note": "This is the benchmark corridor. Huge remittance volume. Mature payout expectations. A very fair place to ask whether stablecoin rails are actually better.",
+      "default_amount_usdc": 10000,
+      "default_monthly_volume_usdc": 3000000,
+      "default_baseline_fee_pct": 0.95,
+      "default_baseline_settlement_hours": 12,
+      "default_current_setup": "US funding counterparty + FX corridor counterparty + Mexico payout network",
+      "polygon_maturity": "High",
+      "stellar_maturity": "Medium",
+      "market_readiness": "High",
+      "ecosystem_support": "Strong",
+      "regulatory_exposure": "Moderate",
+      "launch_readiness": "Ready for serious demo evaluation",
+      "launch_readiness_score": 0.88,
+      "rail_route_fit": {
+        "Polygon": 0.91,
+        "Ethereum": 0.76,
+        "Stellar": 0.68
+      },
+      "solved_infrastructure": [
+        "Polygon: low-cost stablecoin settlement makes the competitive case easier to test in a corridor with real payment volume.",
+        "Ethereum: trusted treasury and custody path if operator comfort matters more than raw cost.",
+        "Stellar: still useful as a payments-native comparator, especially when the conversation turns to remittance rails."
+      ],
+      "open_questions": [
+        "Which Mexico payout counterparty gives sample merchant the cleanest operational path from stablecoin settlement into local disbursement?",
+        "How much fee improvement is needed to beat mature remittance infrastructure in a corridor this competitive?",
+        "What AML and transaction-monitoring evidence would sample merchant require before treating this as demo-ready at scale?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.8,
+        "concentration_risk": 0.31,
+        "whale_bias": 0.22,
+        "rails": {
+          "Polygon": {
+            "share": 0.072,
+            "bridge_share": 0.28,
+            "sender_ratio": 0.46,
+            "receiver_ratio": 0.41,
+            "depth_multiplier": 1.12
+          },
+          "Ethereum": {
+            "share": 0.034,
+            "bridge_share": 0.08,
+            "sender_ratio": 0.37,
+            "receiver_ratio": 0.34,
+            "depth_multiplier": 0.82
+          },
+          "Stellar": {
+            "share": 0.022,
+            "bridge_share": 0.02,
+            "sender_ratio": 0.33,
+            "receiver_ratio": 0.3,
+            "depth_multiplier": 0.7
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Relevant payment-first comparator, but the current Canopy build still treats it as reference context rather than a live route.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.58,
+        "note": "Useful reference for remittance conversations. Still not today's measured winner."
+      }
+    },
+    {
+      "key": "US-BR",
+      "origin": "US",
+      "destination": "BR",
+      "label": "US -> Brazil",
+      "corridor_slug": "us-brazil",
+      "source_country": "US",
+      "destination_country": "Brazil",
+      "destination_city": "Sao Paulo",
+      "map_viewport": {
+        "lat": -23.55052,
+        "lon": -46.633308,
+        "zoom": 10.8,
+        "bearing": -8,
+        "pitch": 0
+      },
+      "corridor_note": "Brazil is the cleanest demo story in the bunch. Real stablecoin activity. Real PIX-adjacent narrative. Real reason to care.",
+      "default_amount_usdc": 50000,
+      "default_monthly_volume_usdc": 3000000,
+      "default_baseline_fee_pct": 1.2,
+      "default_baseline_settlement_hours": 24,
+      "default_current_setup": "SWIFT + FX provider + Brazil payout counterparty",
+      "polygon_maturity": "High",
+      "stellar_maturity": "Medium",
+      "market_readiness": "High",
+      "ecosystem_support": "Strong",
+      "regulatory_exposure": "Moderate",
+      "launch_readiness": "Ready for structured demo",
+      "launch_readiness_score": 0.86,
+      "rail_route_fit": {
+        "Polygon": 0.89,
+        "Ethereum": 0.77,
+        "Stellar": 0.64
+      },
+      "solved_infrastructure": [
+        "Polygon: Brazil has strong stablecoin-to-PIX narratives and enterprise payment examples.",
+        "Ethereum: institutionally familiar rail with broad custody and treasury support.",
+        "Stellar: PIX-connected wallet and payout patterns exist, but enterprise route validation still needs diligence."
+      ],
+      "open_questions": [
+        "Which local payout or treasury counterparty would sample merchant trust first for production rollout?",
+        "How much corridor volume must be executable before the demo is strategically meaningful?",
+        "What internal evidence does sample merchant need beyond a live demo to move to a structured demo?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 7.4,
+        "concentration_risk": 0.28,
+        "whale_bias": 0.3,
+        "rails": {
+          "Polygon": {
+            "share": 0.088,
+            "bridge_share": 0.34,
+            "sender_ratio": 0.45,
+            "receiver_ratio": 0.39,
+            "depth_multiplier": 1.18
+          },
+          "Ethereum": {
+            "share": 0.041,
+            "bridge_share": 0.1,
+            "sender_ratio": 0.35,
+            "receiver_ratio": 0.31,
+            "depth_multiplier": 0.86
+          },
+          "Stellar": {
+            "share": 0.018,
+            "bridge_share": 0.03,
+            "sender_ratio": 0.28,
+            "receiver_ratio": 0.27,
+            "depth_multiplier": 0.66
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Good anchor-led story, but still more comparator than live route in this build.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.62,
+        "note": "Good comparator. Not the live call today."
+      }
+    },
+    {
+      "key": "US-NG",
+      "origin": "US",
+      "destination": "NG",
+      "label": "US -> Nigeria",
+      "corridor_slug": "us-nigeria",
+      "source_country": "US",
+      "destination_country": "Nigeria",
+      "destination_city": "Lagos",
+      "map_viewport": {
+        "lat": 6.524379,
+        "lon": 3.379206,
+        "zoom": 11.2,
+        "bearing": -6,
+        "pitch": 0
+      },
+      "corridor_note": "Nigeria is the canonical payroll-readiness demo corridor. The story is operational certainty before release, not execution speed in isolation.",
+      "default_amount_usdc": 2450000,
+      "default_monthly_volume_usdc": 9800000,
+      "default_baseline_fee_pct": 1.38,
+      "default_baseline_settlement_hours": 40,
+      "default_current_setup": "USD prefunding via treasury bank, local NGN payout counterparty, manual beneficiary review",
+      "polygon_maturity": "Medium-high",
+      "stellar_maturity": "Medium",
+      "market_readiness": "Medium-high",
+      "ecosystem_support": "Directional",
+      "regulatory_exposure": "High",
+      "launch_readiness": "Use with readiness controls, not straight-through release",
+      "launch_readiness_score": 0.69,
+      "rail_route_fit": {
+        "Polygon": 0.78,
+        "Ethereum": 0.81,
+        "Stellar": 0.58
+      },
+      "solved_infrastructure": [
+        "Polygon: low-cost settlement still matters if the payout stack and control workflow stay disciplined.",
+        "Ethereum: higher-trust fallback when operator comfort matters more than transfer cost.",
+        "Canopy: decision-layer controls can surface cutoff, beneficiary, and buffer risk before release."
+      ],
+      "open_questions": [
+        "Which Nigeria payout counterparty can reliably hold daylight capacity for payroll release windows?",
+        "How should sample merchant evidence beneficiary ownership changes before late-day approval?",
+        "What release buffer is required when prefunding lands inside the same-day cutoff window?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.9,
+        "concentration_risk": 0.43,
+        "whale_bias": 0.24,
+        "rails": {
+          "Polygon": {
+            "share": 0.052,
+            "bridge_share": 0.39,
+            "sender_ratio": 0.37,
+            "receiver_ratio": 0.31,
+            "depth_multiplier": 0.92
+          },
+          "Ethereum": {
+            "share": 0.047,
+            "bridge_share": 0.12,
+            "sender_ratio": 0.35,
+            "receiver_ratio": 0.3,
+            "depth_multiplier": 0.95
+          },
+          "Stellar": {
+            "share": 0.013,
+            "bridge_share": 0.03,
+            "sender_ratio": 0.21,
+            "receiver_ratio": 0.2,
+            "depth_multiplier": 0.5
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Useful payments comparator, but the current build still treats it as reference context rather than live payroll evidence.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.53,
+        "note": "Relevant committee context, but not the measured release call."
+      }
+    },
+    {
+      "key": "US-PH",
+      "origin": "US",
+      "destination": "PH",
+      "label": "US -> Philippines",
+      "corridor_slug": "us-philippines",
+      "source_country": "US",
+      "destination_country": "Philippines",
+      "destination_city": "Manila",
+      "map_viewport": {
+        "lat": 14.599512,
+        "lon": 120.984222,
+        "zoom": 11.6,
+        "bearing": -10,
+        "pitch": 0
+      },
+      "corridor_note": "The Philippines is a serious corridor. Big remittance energy. Good payout story. Still needs counterparty diligence.",
+      "default_amount_usdc": 5000,
+      "default_monthly_volume_usdc": 1500000,
+      "default_baseline_fee_pct": 1.4,
+      "default_baseline_settlement_hours": 36,
+      "default_current_setup": "SWIFT + local payout counterparty + treasury prefunding",
+      "polygon_maturity": "High",
+      "stellar_maturity": "Medium",
+      "market_readiness": "Medium-high",
+      "ecosystem_support": "Strong",
+      "regulatory_exposure": "Moderate",
+      "launch_readiness": "Validate next",
+      "launch_readiness_score": 0.74,
+      "rail_route_fit": {
+        "Polygon": 0.82,
+        "Ethereum": 0.75,
+        "Stellar": 0.7
+      },
+      "solved_infrastructure": [
+        "Polygon: well-understood low-cost payout rail narrative with institutional validators.",
+        "Ethereum: broadly trusted infrastructure baseline if cost is secondary to familiarity.",
+        "Stellar: strong remittance reputation and payment-native story for committee discussion."
+      ],
+      "open_questions": [
+        "What last-mile payout counterparty would sample merchant use to make stablecoin settlement operationally invisible?",
+        "How would sample merchant handle attribution and sanctions monitoring across off-ramp counterpartys?",
+        "Would sample merchant evaluate this as consumer remittance infrastructure or broader payout infrastructure?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 7.1,
+        "concentration_risk": 0.34,
+        "whale_bias": 0.19,
+        "rails": {
+          "Polygon": {
+            "share": 0.058,
+            "bridge_share": 0.31,
+            "sender_ratio": 0.44,
+            "receiver_ratio": 0.4,
+            "depth_multiplier": 1.04
+          },
+          "Ethereum": {
+            "share": 0.032,
+            "bridge_share": 0.09,
+            "sender_ratio": 0.34,
+            "receiver_ratio": 0.31,
+            "depth_multiplier": 0.78
+          },
+          "Stellar": {
+            "share": 0.026,
+            "bridge_share": 0.03,
+            "sender_ratio": 0.36,
+            "receiver_ratio": 0.34,
+            "depth_multiplier": 0.74
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Good remittance story, but the corridor-grade proof still is not there yet.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.6,
+        "note": "Relevant context if you like payment-first rails. Still not today's live call."
+      }
+    },
+    {
+      "key": "US-VN",
+      "origin": "US",
+      "destination": "VN",
+      "label": "US -> Vietnam",
+      "corridor_slug": "us-vietnam",
+      "source_country": "US",
+      "destination_country": "Vietnam",
+      "destination_city": "Ho Chi Minh City",
+      "map_viewport": {
+        "lat": 10.823099,
+        "lon": 106.629662,
+        "zoom": 11.3,
+        "bearing": -12,
+        "pitch": 0
+      },
+      "corridor_note": "Vietnam is interesting. Not ready for chest-thumping. More watchlist than victory lap right now.",
+      "default_amount_usdc": 10000,
+      "default_monthly_volume_usdc": 800000,
+      "default_baseline_fee_pct": 1.6,
+      "default_baseline_settlement_hours": 48,
+      "default_current_setup": "SWIFT + banking counterparty + manual treasury review",
+      "polygon_maturity": "Medium",
+      "stellar_maturity": "Medium",
+      "market_readiness": "Developing",
+      "ecosystem_support": "Emerging",
+      "regulatory_exposure": "Elevated",
+      "launch_readiness": "Watchlist until diligence clears",
+      "launch_readiness_score": 0.58,
+      "rail_route_fit": {
+        "Polygon": 0.64,
+        "Ethereum": 0.76,
+        "Stellar": 0.58
+      },
+      "solved_infrastructure": [
+        "Ethereum: strongest baseline for trust and broad provider compatibility.",
+        "Polygon: attractive cost profile and strong stablecoin ecosystem if local payouts can be solved.",
+        "Stellar: purpose-built payment story is relevant, but corridor-specific proof still matters."
+      ],
+      "open_questions": [
+        "Which regulated off-ramp or payout counterparty is strongest for Vietnam today?",
+        "Is stablecoin settlement reducing a real sample merchant pain point here, or only changing the funding leg?",
+        "Should this corridor be used for a demo now or only as a strategic watchlist corridor?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.1,
+        "concentration_risk": 0.46,
+        "whale_bias": 0.16,
+        "rails": {
+          "Polygon": {
+            "share": 0.031,
+            "bridge_share": 0.42,
+            "sender_ratio": 0.29,
+            "receiver_ratio": 0.25,
+            "depth_multiplier": 0.74
+          },
+          "Ethereum": {
+            "share": 0.029,
+            "bridge_share": 0.14,
+            "sender_ratio": 0.33,
+            "receiver_ratio": 0.29,
+            "depth_multiplier": 0.82
+          },
+          "Stellar": {
+            "share": 0.012,
+            "bridge_share": 0.04,
+            "sender_ratio": 0.23,
+            "receiver_ratio": 0.22,
+            "depth_multiplier": 0.52
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Interesting on paper, but the corridor-specific maturity is still fuzzy.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.52,
+        "note": "Keep it in the conversation. Do not mistake it for a live recommendation."
+      }
+    },
+    {
+      "key": "SG-ID",
+      "origin": "SG",
+      "destination": "ID",
+      "label": "Singapore -> Indonesia",
+      "corridor_slug": "singapore-indonesia",
+      "source_country": "Singapore",
+      "destination_country": "Indonesia",
+      "destination_city": "Jakarta",
+      "map_viewport": {
+        "lat": -6.208763,
+        "lon": 106.845599,
+        "zoom": 10.8,
+        "bearing": -7,
+        "pitch": 0
+      },
+      "corridor_note": "This is Southeast Asia operator reality. Payroll, vendors, regional fintech settlement. Real demand, but infrastructure maturity is not evenly distributed.",
+      "default_amount_usdc": 10000,
+      "default_monthly_volume_usdc": 1200000,
+      "default_baseline_fee_pct": 1.25,
+      "default_baseline_settlement_hours": 18,
+      "default_current_setup": "Singapore treasury account + regional FX desk + Indonesia payout counterparty",
+      "polygon_maturity": "Medium-high",
+      "stellar_maturity": "Medium",
+      "market_readiness": "Medium-high",
+      "ecosystem_support": "Strong",
+      "regulatory_exposure": "Moderate",
+      "launch_readiness": "Promising with counterparty diligence",
+      "launch_readiness_score": 0.72,
+      "rail_route_fit": {
+        "Polygon": 0.84,
+        "Ethereum": 0.74,
+        "Stellar": 0.63
+      },
+      "solved_infrastructure": [
+        "Polygon: regional fintech operators will like the cost profile if the last-mile payout stack is dependable.",
+        "Ethereum: trusted baseline for operators that care more about institutional familiarity than cheap execution.",
+        "Stellar: payments-oriented story is relevant, but corridor-specific operator proof is still thinner than the narrative."
+      ],
+      "open_questions": [
+        "Which Indonesia payout or treasury counterparty is mature enough to make regional settlement feel operationally boring?",
+        "How much of the corridor read reflects real business settlement versus broader regional crypto activity?",
+        "What regulatory and reporting controls would Singapore-based operators need before scaling this corridor confidently?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.7,
+        "concentration_risk": 0.37,
+        "whale_bias": 0.27,
+        "rails": {
+          "Polygon": {
+            "share": 0.049,
+            "bridge_share": 0.38,
+            "sender_ratio": 0.41,
+            "receiver_ratio": 0.36,
+            "depth_multiplier": 1.02
+          },
+          "Ethereum": {
+            "share": 0.027,
+            "bridge_share": 0.12,
+            "sender_ratio": 0.31,
+            "receiver_ratio": 0.28,
+            "depth_multiplier": 0.8
+          },
+          "Stellar": {
+            "share": 0.015,
+            "bridge_share": 0.03,
+            "sender_ratio": 0.26,
+            "receiver_ratio": 0.25,
+            "depth_multiplier": 0.61
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Compelling regional-payments comparator, though the corridor-specific operator evidence is still mostly directional.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.55,
+        "note": "Relevant for SEA settlement conversations. Still reference context in this demo."
+      }
+    },
+    {
+      "key": "SG-VN",
+      "origin": "SG",
+      "destination": "VN",
+      "label": "Singapore -> Vietnam",
+      "corridor_slug": "singapore-vietnam",
+      "source_country": "Singapore",
+      "destination_country": "Vietnam",
+      "destination_city": "Ho Chi Minh City",
+      "map_viewport": {
+        "lat": 10.823099,
+        "lon": 106.629662,
+        "zoom": 11.2,
+        "bearing": -10,
+        "pitch": 0
+      },
+      "corridor_note": "This is a regional treasury-and-payroll corridor where Singapore operating discipline meets Vietnam payout complexity. It is more credible than generic watchlist mode, but still needs real counterparty evidence.",
+      "default_amount_usdc": 750000,
+      "default_monthly_volume_usdc": 2400000,
+      "default_baseline_fee_pct": 1.18,
+      "default_baseline_settlement_hours": 18,
+      "default_current_setup": "Singapore treasury account + regional FX desk + Vietnam payout counterparty with manual release controls",
+      "polygon_maturity": "Medium-high",
+      "stellar_maturity": "Medium",
+      "market_readiness": "Medium-high",
+      "ecosystem_support": "Emerging",
+      "regulatory_exposure": "Moderate",
+      "launch_readiness": "Good demo candidate with strong counterparty diligence",
+      "launch_readiness_score": 0.74,
+      "rail_route_fit": {
+        "Polygon": 0.83,
+        "Ethereum": 0.78,
+        "Stellar": 0.6
+      },
+      "solved_infrastructure": [
+        "Polygon: attractive for regional treasury movement if the Vietnam payout handoff is contractually reliable.",
+        "Ethereum: stronger fallback when operator trust, custody familiarity, and reviewability matter more than cost.",
+        "Stellar: interesting as a payments-native comparator, though enterprise evidence still trails Polygon and Ethereum."
+      ],
+      "open_questions": [
+        "Which Vietnam payout or treasury counterparty can make beneficiary release windows feel operationally boring?",
+        "How much of the SG -> Vietnam signal reflects real operating flows versus broader regional stablecoin activity?",
+        "What reporting and control evidence would a Singapore-based operator need before scaling this corridor beyond demo mode?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.6,
+        "concentration_risk": 0.35,
+        "whale_bias": 0.24,
+        "rails": {
+          "Polygon": {
+            "share": 0.043,
+            "bridge_share": 0.37,
+            "sender_ratio": 0.4,
+            "receiver_ratio": 0.34,
+            "depth_multiplier": 1.0
+          },
+          "Ethereum": {
+            "share": 0.029,
+            "bridge_share": 0.11,
+            "sender_ratio": 0.33,
+            "receiver_ratio": 0.29,
+            "depth_multiplier": 0.84
+          },
+          "Stellar": {
+            "share": 0.013,
+            "bridge_share": 0.03,
+            "sender_ratio": 0.24,
+            "receiver_ratio": 0.22,
+            "depth_multiplier": 0.55
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Useful regional-payments comparator, but enterprise-grade proof is still thinner than Polygon or Ethereum here.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.53,
+        "note": "Keep it in the comparison set for SEA workflows, not as the primary live recommendation."
+      }
+    },
+    {
+      "key": "JP-SG",
+      "origin": "JP",
+      "destination": "SG",
+      "label": "Japan -> Singapore",
+      "corridor_slug": "japan-singapore",
+      "source_country": "Japan",
+      "destination_country": "Singapore",
+      "destination_city": "Singapore",
+      "map_viewport": {
+        "lat": 1.352083,
+        "lon": 103.819839,
+        "zoom": 10.9,
+        "bearing": -5,
+        "pitch": 0
+      },
+      "corridor_note": "This is not a remittance story. It is a treasury and regional-operations story between two high-trust jurisdictions with very different infrastructure dynamics.",
+      "default_amount_usdc": 10000,
+      "default_monthly_volume_usdc": 2000000,
+      "default_baseline_fee_pct": 0.85,
+      "default_baseline_settlement_hours": 10,
+      "default_current_setup": "Japan treasury bank + Singapore entity account + regional operating stack",
+      "polygon_maturity": "Medium-high",
+      "stellar_maturity": "Medium",
+      "market_readiness": "High",
+      "ecosystem_support": "Strong",
+      "regulatory_exposure": "Low",
+      "launch_readiness": "Strong for treasury exploration",
+      "launch_readiness_score": 0.79,
+      "rail_route_fit": {
+        "Polygon": 0.78,
+        "Ethereum": 0.82,
+        "Stellar": 0.57
+      },
+      "solved_infrastructure": [
+        "Ethereum: strongest fit when the buyer thinks in treasury controls, custody, and institutional comfort.",
+        "Polygon: compelling if cost and transfer speed matter more than blue-chip familiarity.",
+        "Stellar: still useful as a payments-native reference, though the corporate treasury case is less proven here."
+      ],
+      "open_questions": [
+        "Which treasury workflows in Japan-to-Singapore actually benefit from stablecoin settlement rather than existing banking rails?",
+        "How would sample merchant evidence regulatory comfort and internal controls for a treasury-led corridor like this one?",
+        "Is the opportunity here operating expense movement, treasury rebalancing, or venture-style capital deployment?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.4,
+        "concentration_risk": 0.24,
+        "whale_bias": 0.34,
+        "rails": {
+          "Polygon": {
+            "share": 0.037,
+            "bridge_share": 0.3,
+            "sender_ratio": 0.39,
+            "receiver_ratio": 0.33,
+            "depth_multiplier": 0.96
+          },
+          "Ethereum": {
+            "share": 0.046,
+            "bridge_share": 0.05,
+            "sender_ratio": 0.36,
+            "receiver_ratio": 0.32,
+            "depth_multiplier": 0.98
+          },
+          "Stellar": {
+            "share": 0.011,
+            "bridge_share": 0.02,
+            "sender_ratio": 0.24,
+            "receiver_ratio": 0.22,
+            "depth_multiplier": 0.48
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Interesting as a payment rail reference, but the treasury-grade corridor story remains thinner than Ethereum today.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.5,
+        "note": "Keep it as a comparator, not as the main live call for this treasury corridor."
+      }
+    },
+    {
+      "key": "US-ZA",
+      "origin": "US",
+      "destination": "ZA",
+      "label": "US -> South Africa",
+      "corridor_slug": "us-south-africa",
+      "source_country": "US",
+      "destination_country": "South Africa",
+      "destination_city": "Johannesburg",
+      "map_viewport": {
+        "lat": -26.204103,
+        "lon": 28.047305,
+        "zoom": 10.7,
+        "bearing": -7,
+        "pitch": 0
+      },
+      "corridor_note": "South Africa is a treasury and payroll corridor where timing, payout counterparty reliability, and liquidity posture matter more than headline remittance volume.",
+      "default_amount_usdc": 5600000,
+      "default_monthly_volume_usdc": 11400000,
+      "default_baseline_fee_pct": 1.08,
+      "default_baseline_settlement_hours": 18,
+      "default_current_setup": "USD prefunding with local ZAR payout counterparty and standard beneficiary controls",
+      "polygon_maturity": "Medium-high",
+      "stellar_maturity": "Medium",
+      "market_readiness": "High",
+      "ecosystem_support": "Strong",
+      "regulatory_exposure": "Moderate",
+      "launch_readiness": "Ready for simulator-led treasury review",
+      "launch_readiness_score": 0.81,
+      "rail_route_fit": {
+        "Polygon": 0.85,
+        "Ethereum": 0.79,
+        "Stellar": 0.59
+      },
+      "solved_infrastructure": [
+        "Polygon: attractive for lower-fee treasury settlement if payout-counterparty timing remains dependable.",
+        "Ethereum: strong institutional fallback when operator trust and capacity confidence matter more than cost.",
+        "Stellar: relevant as a payment-first reference, but still more comparator than live decision rail in this build."
+      ],
+      "open_questions": [
+        "Which South Africa payout counterparty gives sample merchant the cleanest operational handoff from prefunding to beneficiary release?",
+        "How much daytime liquidity needs to be contractually reserved before reducing the release buffer?",
+        "What operator controls are required to make ZAR settlement timing defensible during payroll cutoff windows?"
+      ],
+      "analytics_profile": {
+        "weekly_multiplier": 6.9,
+        "concentration_risk": 0.29,
+        "whale_bias": 0.26,
+        "rails": {
+          "Polygon": {
+            "share": 0.061,
+            "bridge_share": 0.32,
+            "sender_ratio": 0.43,
+            "receiver_ratio": 0.38,
+            "depth_multiplier": 1.1
+          },
+          "Ethereum": {
+            "share": 0.038,
+            "bridge_share": 0.11,
+            "sender_ratio": 0.35,
+            "receiver_ratio": 0.31,
+            "depth_multiplier": 0.9
+          },
+          "Stellar": {
+            "share": 0.014,
+            "bridge_share": 0.03,
+            "sender_ratio": 0.24,
+            "receiver_ratio": 0.22,
+            "depth_multiplier": 0.58
+          }
+        }
+      },
+      "stellar_reference": {
+        "maturity": "Medium",
+        "liquidity_proxy": "Useful treasury-payments comparator, though the corridor-specific operator proof is still thinner than Polygon or Ethereum.",
+        "settlement": "Approx. 5s ledger close; current Canopy view uses batched analytics, not live rail monitoring.",
+        "confidence": 0.54,
+        "note": "Keep it in the comparison set, but not as the live operational recommendation."
+      }
+    }
+  ]
+}

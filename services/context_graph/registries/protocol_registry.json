@@ -1,0 +1,33 @@
+[
+  {
+    "chain": "Ethereum",
+    "contract_address": "0x7a250d5630b4cf539739df2c5dacab4c659f2488",
+    "protocol_name": "Uniswap V2 Router",
+    "protocol_type": "dex"
+  },
+  {
+    "chain": "Ethereum",
+    "contract_address": "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2",
+    "protocol_name": "Aave V3 Pool",
+    "protocol_type": "lending"
+  },
+  {
+    "chain": "Ethereum",
+    "contract_address": "0xc3d688b66703497daa19211eedff47f25384cdc3",
+    "protocol_name": "Compound V3 USDC",
+    "protocol_type": "lending"
+  },
+  {
+    "chain": "Polygon",
+    "contract_address": "0xa5e0829caced8ffdd4de3c43696c57f7d7a678ff",
+    "protocol_name": "QuickSwap Router",
+    "protocol_type": "dex"
+  },
+  {
+    "chain": "Polygon",
+    "contract_address": "0x794a61358d6845594f94dc1db02a252b5b4814ad",
+    "protocol_name": "Aave V3 Pool",
+    "protocol_type": "lending"
+  }
+]
+

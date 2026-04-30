@@ -1,0 +1,2889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Canopy Route Intelligence benchmark dashboard for observed stablecoin route cost, freshness, route share, and settlement-health signals.">
+    <meta name="theme-color" content="#f3efe6">
+    <title>Canopy Route Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        :root {
+            color-scheme: light;
+            --page: #f3efe6;
+            --page-accent: #e4dcc8;
+            --panel: rgba(255, 252, 247, 0.92);
+            --panel-strong: rgba(255, 250, 242, 0.98);
+            --border: rgba(49, 37, 24, 0.12);
+            --border-strong: rgba(49, 37, 24, 0.22);
+            --text: #1f1a15;
+            --text-soft: #5c5247;
+            --muted: #857868;
+            --ready: #214f43;
+            --review: #8d6a2a;
+            --hold: #8e452d;
+            --blocked: #8f2433;
+            --measured: #315d67;
+            --calculated: #5b5330;
+            --modeled: #554182;
+            --forecasted: #8b4b6d;
+            --shadow: 0 28px 70px rgba(51, 37, 23, 0.12);
+            --radius-xl: 28px;
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+            --font-body: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --font-display: "Cormorant Garamond", Georgia, serif;
+            --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            width: 100%;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), transparent 28%),
+                linear-gradient(135deg, rgba(228, 220, 200, 0.72), transparent 52%),
+                linear-gradient(180deg, #f7f3ea 0%, #f1ecdf 45%, #ece6d9 100%);
+            color: var(--text);
+            font-family: var(--font-body);
+        }
+
+        body {
+            min-height: 100vh;
+            min-width: 1280px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .background-layers {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .background-map-shell {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 240ms ease;
+        }
+
+        .background-map-shell.is-visible {
+            opacity: 1;
+        }
+
+        .background-map {
+            position: absolute;
+            inset: 0;
+        }
+
+        .background-map .mapboxgl-canvas {
+            filter: sepia(0.24) saturate(0.68) hue-rotate(-12deg) brightness(1.05) contrast(0.9);
+            opacity: 0.82;
+        }
+
+        .background-map-scrim {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at top left, rgba(255, 249, 239, 0.54), transparent 28%),
+                linear-gradient(135deg, rgba(111, 88, 64, 0.18), transparent 48%),
+                linear-gradient(180deg, rgba(243, 239, 230, 0.38) 0%, rgba(236, 228, 217, 0.36) 100%);
+            pointer-events: none;
+        }
+
+        button, input, textarea, select {
+            font: inherit;
+        }
+
+        .shell {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr);
+            align-items: start;
+            gap: 24px;
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px 32px;
+            min-height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+
+        .sidebar {
+            width: 320px;
+            position: sticky;
+            top: 0;
+            align-self: start;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 24px 20px;
+            background: rgba(33, 26, 20, 0.88);
+            color: #f6f2ea;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+        }
+
+        .sidebar-brand {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 26px;
+        }
+
+        .eyebrow {
+            font: 600 11px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: rgba(246, 242, 234, 0.68);
+        }
+
+        .brand-title {
+            margin: 0;
+            font: 600 40px/0.94 var(--font-display);
+            letter-spacing: -0.03em;
+        }
+
+        .brand-copy {
+            margin: 0;
+            color: rgba(246, 242, 234, 0.72);
+            line-height: 1.55;
+            font-size: 16px;
+        }
+
+        .sidebar-panel {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .sidebar-panel h2 {
+            margin: 0 0 12px;
+            font-size: 20px;
+            line-height: 1.4;
+        }
+
+        .sidebar-refresh-button {
+            width: 100%;
+            border: 0;
+            border-radius: var(--radius-md);
+            padding: 16px 18px;
+            background: linear-gradient(135deg, #f5efe5, #fffaf2);
+            color: #201710;
+            font: 800 14px/1.3 var(--font-body);
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            box-shadow: 0 14px 28px rgba(20, 12, 6, 0.18);
+        }
+
+        .sidebar-refresh-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .refresh-status {
+            display: grid;
+            gap: 10px;
+        }
+
+        .refresh-status-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .refresh-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.35);
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+        }
+
+        .refresh-light.gray {
+            background: #8d887f;
+        }
+
+        .refresh-light.yellow {
+            background: #f2c35d;
+            animation: refresh-blink 1s ease-in-out infinite;
+        }
+
+        .refresh-light.green {
+            background: #62ba8f;
+        }
+
+        .refresh-light.red {
+            background: #e07a7a;
+        }
+
+        @keyframes refresh-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        .run-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .run-button {
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            color: inherit;
+            border-radius: var(--radius-md);
+            padding: 14px;
+            text-align: left;
+            display: grid;
+            gap: 8px;
+            border-left: 4px solid transparent;
+            transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+        }
+
+        .run-button:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .run-button.active {
+            transform: translateY(-1px);
+            background: linear-gradient(135deg, rgba(255, 251, 243, 0.18), rgba(255, 244, 229, 0.1));
+            border-color: rgba(255, 255, 255, 0.28);
+            border-left-color: #f0cf94;
+            box-shadow: 0 14px 24px rgba(17, 10, 6, 0.18);
+        }
+
+        .run-button.active .run-title > span:first-child,
+        .run-button.active .run-meta {
+            font-weight: 600;
+        }
+
+        .run-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+            font-weight: 700;
+        }
+
+        .run-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            color: rgba(246, 242, 234, 0.72);
+            font-size: 12px;
+        }
+
+        .sidebar-footnote {
+            color: rgba(246, 242, 234, 0.58);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .background-mode-panel {
+            margin-top: auto;
+        }
+
+        .background-mode-toggle {
+            display: grid;
+            gap: 10px;
+        }
+
+        .background-toggle-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .background-toggle-button {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(246, 242, 234, 0.88);
+            padding: 12px 14px;
+            font: 700 13px/1.2 var(--font-body);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+        }
+
+        .background-toggle-button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.22);
+        }
+
+        .background-toggle-button.active {
+            background: linear-gradient(135deg, rgba(245, 239, 229, 0.92), rgba(255, 250, 242, 0.98));
+            border-color: rgba(255, 255, 255, 0.34);
+            color: #201710;
+            box-shadow: 0 12px 22px rgba(12, 7, 4, 0.18);
+        }
+
+        .background-toggle-button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .background-toggle-detail {
+            color: rgba(246, 242, 234, 0.68);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .background-map .mapboxgl-ctrl-attrib {
+            background: rgba(246, 241, 232, 0.9);
+            color: #4f4337;
+            border-radius: 10px 0 0 0;
+            box-shadow: 0 12px 24px rgba(42, 28, 16, 0.12);
+            font-family: var(--font-body);
+        }
+
+        .background-map .mapboxgl-ctrl-attrib a,
+        .background-map .mapboxgl-ctrl-attrib-button {
+            color: #4f4337;
+        }
+
+        .main-breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font: 600 11px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .main-breadcrumb span:last-child {
+            color: var(--text-soft);
+        }
+
+        .active-corridor-banner {
+            display: grid;
+            gap: 18px;
+            padding: 20px 22px;
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(112, 85, 56, 0.16);
+            border-left: 4px solid #9a5b36;
+            background: linear-gradient(135deg, rgba(255, 251, 244, 0.98), rgba(246, 238, 227, 0.94));
+            box-shadow: 0 18px 36px rgba(67, 45, 27, 0.08);
+        }
+
+        .active-corridor-title {
+            display: grid;
+            gap: 6px;
+        }
+
+        .active-corridor-name {
+            font-size: 30px;
+            line-height: 1.1;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: #241912;
+        }
+
+        .active-corridor-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .active-corridor-meta-card {
+            min-width: 0;
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(112, 85, 56, 0.1);
+        }
+
+        .active-corridor-meta-label {
+            font: 600 11px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+        }
+
+        .active-corridor-meta-value {
+            margin-top: 8px;
+            font-size: 18px;
+            line-height: 1.35;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .decision-banner {
+            display: grid;
+            gap: 18px;
+            padding: 22px;
+            border-radius: var(--radius-xl);
+            color: #f8f3eb;
+            box-shadow: 0 24px 48px rgba(33, 26, 20, 0.18);
+        }
+
+        .decision-banner.red {
+            background: linear-gradient(135deg, #7a1f2a, #4b1219);
+        }
+
+        .decision-banner.yellow {
+            background: linear-gradient(135deg, #d8ad57, #a77a21);
+            color: #23190b;
+        }
+
+        .decision-banner.green {
+            background: linear-gradient(135deg, #1f5b41, #163d2c);
+        }
+
+        .decision-banner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .decision-banner-kicker {
+            font: 700 12px/1.3 var(--font-mono);
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            opacity: 0.76;
+        }
+
+        .decision-banner-title {
+            margin-top: 8px;
+            font-size: 34px;
+            line-height: 1.08;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .decision-banner-copy {
+            margin-top: 10px;
+            font-size: 16px;
+            line-height: 1.58;
+            max-width: 76ch;
+            opacity: 0.9;
+        }
+
+        .decision-banner-grid,
+        .decision-banner-detail-grid,
+        .impact-grid,
+        .decision-change-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .decision-banner-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .decision-banner-detail-grid,
+        .decision-change-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .impact-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .decision-banner-card {
+            min-width: 0;
+            padding: 16px 18px;
+            border-radius: var(--radius-lg);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .decision-banner.yellow .decision-banner-card {
+            background: rgba(35, 25, 11, 0.08);
+            border-color: rgba(35, 25, 11, 0.12);
+        }
+
+        .decision-banner-card-label {
+            font: 600 11px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: inherit;
+            opacity: 0.72;
+        }
+
+        .decision-banner-card-value {
+            margin-top: 10px;
+            font-size: 24px;
+            line-height: 1.25;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .decision-banner-card-detail {
+            margin-top: 10px;
+            font-size: 15px;
+            line-height: 1.55;
+            opacity: 0.88;
+        }
+
+        .main {
+            min-width: 0;
+            padding: 0;
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+            min-width: 0;
+        }
+
+        .hero-grid > *,
+        .stat-grid > *,
+        .two-col > *,
+        .three-col > *,
+        .evidence-grid > *,
+        .health-grid > *,
+        .route-grid > * {
+            min-width: 0;
+        }
+
+        .recommendation-banner {
+            display: grid;
+            gap: 20px;
+            padding: 20px;
+            border-radius: var(--radius-xl);
+            background:
+                linear-gradient(135deg, rgba(33, 26, 20, 0.96), rgba(67, 45, 27, 0.92)),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+            color: #f8f3eb;
+            box-shadow: 0 24px 48px rgba(33, 26, 20, 0.22);
+        }
+
+        .recommendation-banner .eyebrow {
+            color: rgba(248, 243, 235, 0.72);
+        }
+
+        .banner-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .banner-card {
+            min-width: 0;
+            padding: 16px 18px;
+            border-radius: var(--radius-lg);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .banner-label {
+            font: 600 11px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(248, 243, 235, 0.7);
+        }
+
+        .banner-value {
+            margin-top: 10px;
+            font-size: 28px;
+            line-height: 1.25;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .banner-copy {
+            margin-top: 8px;
+            color: rgba(248, 243, 235, 0.78);
+            font-size: 16px;
+            line-height: 1.55;
+        }
+
+        .evidence-ladder-bar {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .evidence-step {
+            min-width: 0;
+            padding: 18px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            background: var(--panel-strong);
+            display: grid;
+            gap: 10px;
+        }
+
+        .evidence-step-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .evidence-step-title {
+            font-size: 20px;
+            line-height: 1.4;
+            font-weight: 700;
+        }
+
+        .recommendation-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .run-status-indicator {
+            display: grid;
+            gap: 18px;
+            padding: 20px;
+            border-radius: var(--radius-xl);
+            border: 1px solid transparent;
+        }
+
+        .run-status-indicator.red {
+            background: linear-gradient(135deg, #7a1f2a, #4b1219);
+            color: #fff7f5;
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .run-status-indicator.yellow {
+            background: linear-gradient(135deg, #f2c35d, #d89f2a);
+            color: #23190b;
+            border-color: rgba(35, 25, 11, 0.12);
+        }
+
+        .run-status-indicator.green {
+            background: linear-gradient(135deg, #1f5b41, #163d2c);
+            color: #f6fbf8;
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .run-status-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .run-status-kicker {
+            font: 700 13px/1.3 var(--font-mono);
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            opacity: 0.82;
+        }
+
+        .run-status-headline {
+            margin-top: 8px;
+            font-size: 32px;
+            line-height: 1.2;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .run-status-summary {
+            margin-top: 8px;
+            font-size: 16px;
+            line-height: 1.55;
+            opacity: 0.9;
+        }
+
+        .run-status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 120px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            font: 700 12px/1.2 var(--font-mono);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .run-status-indicator.yellow .run-status-pill {
+            background: rgba(35, 25, 11, 0.1);
+        }
+
+        .run-status-bullets {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .run-status-bullets li + li {
+            margin-top: 8px;
+        }
+
+        .buffer-reason-list {
+            margin: 10px 0 0;
+            padding-left: 18px;
+            color: var(--text-soft);
+        }
+
+        .buffer-reason-list li + li {
+            margin-top: 8px;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 400px;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            min-width: 0;
+        }
+
+        .panel strong {
+            color: var(--text);
+        }
+
+        .hero-panel {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(135deg, rgba(68, 52, 33, 0.10), transparent 44%),
+                linear-gradient(160deg, rgba(255, 255, 255, 0.65), rgba(255, 252, 247, 0.92));
+        }
+
+        .hero-panel::after {
+            content: "";
+            position: absolute;
+            inset: auto -22% -30% auto;
+            width: 340px;
+            height: 340px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(134, 95, 54, 0.16), transparent 70%);
+            pointer-events: none;
+        }
+
+        h1, h2, h3, h4 {
+            margin: 0;
+        }
+
+        h2 {
+            font-size: 28px;
+            line-height: 1.4;
+        }
+
+        .hero-title {
+            margin-top: 10px;
+            font: 600 40px/0.98 var(--font-display);
+            letter-spacing: -0.03em;
+            max-width: 12ch;
+        }
+
+        .hero-subtitle {
+            max-width: 62ch;
+            margin-top: 14px;
+            color: var(--text-soft);
+            line-height: 1.65;
+        }
+
+        .status-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .chip,
+        .evidence-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border-radius: 999px;
+            padding: 9px 12px;
+            font: 600 12px/1.1 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border: 1px solid transparent;
+        }
+
+        .chip.ready { background: rgba(33, 79, 67, 0.10); color: var(--ready); border-color: rgba(33, 79, 67, 0.18); }
+        .chip.review { background: rgba(141, 106, 42, 0.12); color: var(--review); border-color: rgba(141, 106, 42, 0.18); }
+        .chip.hold { background: rgba(142, 69, 45, 0.12); color: var(--hold); border-color: rgba(142, 69, 45, 0.18); }
+        .chip.blocked { background: rgba(143, 36, 51, 0.12); color: var(--blocked); border-color: rgba(143, 36, 51, 0.18); }
+
+        .evidence-chip.measured { background: rgba(49, 93, 103, 0.10); color: var(--measured); border-color: rgba(49, 93, 103, 0.18); }
+        .evidence-chip.calculated { background: rgba(91, 83, 48, 0.12); color: var(--calculated); border-color: rgba(91, 83, 48, 0.18); }
+        .evidence-chip.modeled { background: rgba(85, 65, 130, 0.12); color: var(--modeled); border-color: rgba(85, 65, 130, 0.18); }
+        .evidence-chip.forecasted { background: rgba(139, 75, 109, 0.12); color: var(--forecasted); border-color: rgba(139, 75, 109, 0.18); }
+
+        .stat-grid,
+        .two-col,
+        .three-col {
+            display: grid;
+            gap: 20px;
+        }
+
+        .stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 20px;
+        }
+
+        .two-col {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .three-col {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .stat-card,
+        .queue-card,
+        .ladder-card,
+        .exception-card,
+        .change-card,
+        .mini-card {
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            background: var(--panel-strong);
+            padding: 18px;
+            min-width: 0;
+        }
+
+        .stat-label,
+        .mini-label {
+            font: 600 11px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+        }
+
+        .stat-value {
+            margin-top: 8px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .stat-detail,
+        .mini-detail,
+        .body-copy {
+            margin-top: 8px;
+            color: var(--text-soft);
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .section-heading {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .section-heading p {
+            margin: 8px 0 0;
+            color: var(--text-soft);
+            line-height: 1.6;
+            max-width: 62ch;
+        }
+
+        .queue-list,
+        .simple-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .queue-card h3,
+        .ladder-card h3,
+        .exception-card h3,
+        .change-card h3 {
+            font-size: 17px;
+        }
+
+        .queue-card p,
+        .ladder-card p,
+        .exception-card p,
+        .change-card p {
+            margin: 10px 0 0;
+            color: var(--text-soft);
+            line-height: 1.6;
+        }
+
+        .row-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .meta-pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(49, 37, 24, 0.05);
+            color: var(--text-soft);
+            font: 500 11px/1.2 var(--font-mono);
+            border: 1px solid rgba(49, 37, 24, 0.08);
+        }
+
+        .evidence-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+        }
+
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+        }
+
+        .ladder-card {
+            min-height: 100%;
+            display: grid;
+            gap: 10px;
+            align-content: start;
+        }
+
+        .ladder-value {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .route-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 24px;
+        }
+
+        .bullets {
+            margin: 12px 0 0;
+            padding-left: 18px;
+            color: var(--text-soft);
+        }
+
+        .bullets li + li {
+            margin-top: 8px;
+        }
+
+        .decision-actions {
+            display: grid;
+            gap: 12px;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+        }
+
+        .field label {
+            font: 600 14px/1.4 var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+        }
+
+        .field input,
+        .field textarea,
+        .field select {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.88);
+            padding: 12px 14px;
+            color: var(--text);
+            min-width: 0;
+        }
+
+        .field textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .actions-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .primary-button,
+        .ghost-button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 16px;
+            font-weight: 700;
+        }
+
+        .primary-button {
+            background: linear-gradient(135deg, #2f271e, #54412c);
+            color: #fff8f0;
+            box-shadow: 0 14px 28px rgba(50, 36, 20, 0.18);
+        }
+
+        .ghost-button {
+            background: rgba(49, 37, 24, 0.06);
+            color: var(--text);
+            border: 1px solid rgba(49, 37, 24, 0.12);
+        }
+
+        .message {
+            min-height: 20px;
+            color: var(--text-soft);
+            font-size: 14px;
+            white-space: pre-line;
+        }
+
+        .loading {
+            padding: 28px;
+            color: var(--text-soft);
+        }
+
+        @media (min-width: 1440px) {
+            .shell {
+                grid-template-columns: 320px minmax(0, 1fr);
+            }
+
+            .hero-grid {
+                grid-template-columns: minmax(0, 1fr) 420px;
+            }
+
+            .hero-grid > :first-child {
+                grid-row: 1 / span 2;
+            }
+
+            .three-col,
+            .evidence-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 1439px) {
+            .shell {
+                grid-template-columns: 280px minmax(0, 1fr);
+                max-width: none;
+                padding: 20px 24px;
+            }
+
+            .sidebar {
+                width: 280px;
+            }
+
+            .banner-grid,
+            .decision-banner-grid,
+            .impact-grid,
+            .stat-grid,
+            .evidence-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .decision-banner-detail-grid,
+            .decision-change-grid,
+            .active-corridor-meta,
+            .recommendation-grid,
+            .two-col,
+            .three-col,
+            .health-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .evidence-ladder-bar {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .hero-grid,
+            .route-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                min-width: 0;
+            }
+
+            .shell {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                padding: 16px;
+            }
+
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+                min-height: 0;
+                padding: 18px 16px;
+                overflow: visible;
+            }
+
+            .banner-grid,
+            .decision-banner-grid,
+            .decision-banner-detail-grid,
+            .impact-grid,
+            .decision-change-grid,
+            .active-corridor-meta,
+            .evidence-ladder-bar,
+            .recommendation-grid,
+            .hero-grid,
+            .health-grid,
+            .stat-grid,
+            .route-grid,
+            .two-col,
+            .three-col,
+            .evidence-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                padding: 20px;
+            }
+
+            .run-status-header {
+                flex-direction: column;
+            }
+
+            .hero-title { font-size: 38px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-layers">
+        <div id="mapBackgroundShell" class="background-map-shell">
+            <div id="mapBackground" class="background-map"></div>
+            <div class="background-map-scrim"></div>
+        </div>
+    </div>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="eyebrow">Canopy Route Intelligence</div>
+                <h1 class="brand-title">Canopy Decision Layer</h1>
+                <p class="brand-copy">
+                    Cache-backed control room for payroll release decisions, capital-aware prefunding posture,
+                    and honest separation between system evidence state and corridor readiness.
+                </p>
+            </div>
+
+            <section class="sidebar-panel">
+                <div id="refreshControlCard" class="simple-list"></div>
+            </section>
+
+            <section class="sidebar-panel">
+                <h2>Operating Mode</h2>
+                <div id="modeCard" class="simple-list"></div>
+            </section>
+
+            <section class="sidebar-panel">
+                <h2>Payroll Runs</h2>
+                <div id="runList" class="run-list"></div>
+            </section>
+
+            <section class="sidebar-panel">
+                <h2>Evidence Ladder</h2>
+                <div id="evidenceExplainer" class="simple-list"></div>
+            </section>
+
+            <section class="sidebar-panel background-mode-panel">
+                <h2>Background</h2>
+                <div id="backgroundModeCard" class="background-mode-toggle"></div>
+            </section>
+
+            <p id="sidebarFootnote" class="sidebar-footnote">
+                Cache-backed measured evidence only. Request handlers serve materialized state and never run raw BigQuery queries.
+            </p>
+        </aside>
+
+        <main class="main">
+            <div id="app" class="grid">
+                <div class="loading">Loading payroll readiness workspace...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+    <script>
+        const API_BASE = window.location.origin;
+        const BACKGROUND_MODE_KEY = "canopyBackgroundMode";
+        const state = {
+            overview: null,
+            runs: [],
+            selectedRunId: null,
+            detail: null,
+            exceptions: [],
+            isSwitchingRun: false,
+            pendingRunRequestId: 0,
+            clientConfig: null,
+            decisionFlashMessage: "",
+            refreshControl: null,
+            backgroundMode: readStoredBackgroundMode(),
+            mapInstance: null,
+            mapInitialized: false,
+            mapAvailable: false,
+            mapLoadFailed: false,
+        };
+
+        function readStoredBackgroundMode() {
+            try {
+                return window.sessionStorage.getItem(BACKGROUND_MODE_KEY) === "map" ? "map" : "plain";
+            } catch (_error) {
+                return "plain";
+            }
+        }
+
+        function storeBackgroundMode(mode) {
+            try {
+                window.sessionStorage.setItem(BACKGROUND_MODE_KEY, mode);
+            } catch (_error) {
+                // Session storage is optional for this decorative preference.
+            }
+        }
+
+        async function fetchJson(url, options) {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const payload = await response.text();
+                throw new Error(payload || `Request failed with ${response.status}`);
+            }
+            return response.json();
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "-")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function statusClass(status) {
+            if (status === "READY_FOR_APPROVAL") return "ready";
+            if (status === "REVIEW_REQUIRED") return "review";
+            if (status === "HOLD") return "hold";
+            return "blocked";
+        }
+
+        function formatTimestamp(value) {
+            if (!value) return "-";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString([], {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "UTC",
+                hour12: false,
+                timeZoneName: "short",
+            });
+        }
+
+        function formatTimestampOrInitializing(value) {
+            return value ? formatTimestamp(value) : "Initializing";
+        }
+
+        function formatUsd(value, maximumFractionDigits = 0) {
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+                maximumFractionDigits,
+            }).format(Number(value || 0));
+        }
+
+        function formatPercent(value) {
+            return `${Math.round(Number(value || 0) * 100)}%`;
+        }
+
+        function formatDurationMinutes(value) {
+            const minutes = Number(value);
+            if (!Number.isFinite(minutes)) return "Initializing";
+            if (minutes < 60) return `${Math.round(minutes)} minutes`;
+            const hours = Math.floor(minutes / 60);
+            const remainder = Math.max(0, Math.round(minutes % 60));
+            return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+        }
+
+        function formatReceiptFilenameTimestamp(value) {
+            const date = value ? new Date(value) : new Date();
+            const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+            const year = safeDate.getUTCFullYear();
+            const month = String(safeDate.getUTCMonth() + 1).padStart(2, "0");
+            const day = String(safeDate.getUTCDate()).padStart(2, "0");
+            const hour = String(safeDate.getUTCHours()).padStart(2, "0");
+            const minute = String(safeDate.getUTCMinutes()).padStart(2, "0");
+            return `${year}${month}${day}_${hour}${minute}`;
+        }
+
+        function buildPayrollReceiptFilename(detail) {
+            const corridor = String(detail?.corridor || "corridor")
+                .replace(/\s*->\s*/g, "_")
+                .replace(/[^\w]+/g, "_")
+                .replace(/^_+|_+$/g, "");
+            const timestamp = formatReceiptFilenameTimestamp(
+                detail?.latest_decision?.updated_at || detail?.last_evaluation_at || new Date().toISOString()
+            );
+            return `payroll_decision_receipt_${corridor}_${timestamp}.txt`;
+        }
+
+        function getRoutePayload() {
+            return state.detail?.route_recommendation?.route_payload || null;
+        }
+
+        function getMapViewport() {
+            return getRoutePayload()?.map_viewport || null;
+        }
+
+        function canUseMapBackground() {
+            return Boolean(
+                state.clientConfig?.mapbox_token_present
+                && window.mapboxgl
+                && !state.mapLoadFailed
+                && getMapViewport()
+            );
+        }
+
+        function applyMapPalette(map) {
+            const style = map.getStyle();
+            (style.layers || []).forEach((layer) => {
+                const layerId = String(layer.id || "").toLowerCase();
+                try {
+                    if (layer.type === "background") {
+                        map.setPaintProperty(layer.id, "background-color", "#efe6d8");
+                    }
+                    if (layer.type === "fill") {
+                        if (layerId.includes("water")) {
+                            map.setPaintProperty(layer.id, "fill-color", "#9a8a79");
+                            map.setPaintProperty(layer.id, "fill-opacity", 0.34);
+                        } else if (layerId.includes("park") || layerId.includes("landuse")) {
+                            map.setPaintProperty(layer.id, "fill-color", "#d9cdb9");
+                            map.setPaintProperty(layer.id, "fill-opacity", 0.28);
+                        } else {
+                            map.setPaintProperty(layer.id, "fill-color", "#eadfce");
+                            map.setPaintProperty(layer.id, "fill-opacity", 0.24);
+                        }
+                    }
+                    if (layer.type === "line") {
+                        if (layerId.includes("road")) {
+                            map.setPaintProperty(layer.id, "line-color", "#6f5a4c");
+                            map.setPaintProperty(layer.id, "line-opacity", 0.22);
+                        } else if (layerId.includes("admin") || layerId.includes("boundary")) {
+                            map.setPaintProperty(layer.id, "line-color", "#8a7564");
+                            map.setPaintProperty(layer.id, "line-opacity", 0.18);
+                        }
+                    }
+                    if (layer.type === "symbol") {
+                        if (layer.layout?.["text-field"]) {
+                            map.setPaintProperty(layer.id, "text-color", "#4f4237");
+                            map.setPaintProperty(layer.id, "text-halo-color", "#efe5d7");
+                            map.setPaintProperty(layer.id, "text-halo-width", 0.8);
+                            map.setPaintProperty(layer.id, "text-opacity", layerId.includes("poi") ? 0.42 : 0.7);
+                        }
+                        if (layer.layout?.["icon-image"]) {
+                            map.setPaintProperty(layer.id, "icon-opacity", 0.35);
+                        }
+                    }
+                } catch (_error) {
+                    // Style mutations are best-effort and should never affect app behavior.
+                }
+            });
+        }
+
+        function ensureMapBackground() {
+            if (state.mapInstance || !state.clientConfig?.mapbox_token || !window.mapboxgl) {
+                return;
+            }
+            try {
+                mapboxgl.accessToken = state.clientConfig.mapbox_token;
+                const map = new mapboxgl.Map({
+                    container: "mapBackground",
+                    style: "mapbox://styles/mapbox/light-v11",
+                    center: [0, 14],
+                    zoom: 1.4,
+                    bearing: 0,
+                    pitch: 0,
+                    interactive: false,
+                    attributionControl: true,
+                    fadeDuration: 0,
+                    logoPosition: "bottom-right",
+                });
+                map.on("load", () => {
+                    state.mapInitialized = true;
+                    applyMapPalette(map);
+                    syncBackgroundPresentation({ animate: false });
+                });
+                map.on("error", () => {
+                    state.mapLoadFailed = true;
+                    state.mapAvailable = false;
+                    syncBackgroundPresentation({ animate: false });
+                    renderSidebar();
+                });
+                state.mapInstance = map;
+            } catch (_error) {
+                state.mapLoadFailed = true;
+                state.mapAvailable = false;
+            }
+        }
+
+        function syncMapViewport({ animate = true } = {}) {
+            if (!state.mapInstance || !state.mapInitialized) return;
+            const viewport = getMapViewport();
+            if (!viewport) return;
+            const camera = {
+                center: [Number(viewport.lon || 0), Number(viewport.lat || 0)],
+                zoom: Number(viewport.zoom || 10.5),
+                bearing: Number(viewport.bearing || 0),
+                pitch: Number(viewport.pitch || 0),
+                essential: false,
+            };
+            if (animate) {
+                state.mapInstance.flyTo({ ...camera, duration: 1600, curve: 1.1, speed: 0.65 });
+            } else {
+                state.mapInstance.jumpTo(camera);
+            }
+        }
+
+        function syncBackgroundPresentation({ animate = true } = {}) {
+            const mapBackgroundShell = document.getElementById("mapBackgroundShell");
+            const shouldShowMap = state.backgroundMode === "map" && canUseMapBackground();
+            document.body.classList.toggle("background-mode-map", shouldShowMap);
+            mapBackgroundShell?.classList.toggle("is-visible", shouldShowMap);
+            state.mapAvailable = Boolean(state.clientConfig?.mapbox_token_present && window.mapboxgl && !state.mapLoadFailed);
+            if (!shouldShowMap) {
+                return;
+            }
+            ensureMapBackground();
+            if (state.mapInitialized) {
+                syncMapViewport({ animate });
+                state.mapInstance.resize();
+            }
+        }
+
+        function setBackgroundMode(mode) {
+            state.backgroundMode = mode === "map" ? "map" : "plain";
+            storeBackgroundMode(state.backgroundMode);
+            renderSidebar();
+            syncBackgroundPresentation({ animate: false });
+        }
+
+        function renderBackgroundModeCard() {
+            const backgroundModeCard = document.getElementById("backgroundModeCard");
+            if (!backgroundModeCard) return;
+            const mapEnabled = state.backgroundMode === "map";
+            const mapIsAvailable = Boolean(state.clientConfig?.mapbox_token_present && window.mapboxgl && !state.mapLoadFailed);
+            const viewport = getMapViewport();
+            const mapDetail = viewport
+                ? "Map follows the selected run's city-level view."
+                : "Map follows the selected run once corridor viewport data is available.";
+            backgroundModeCard.innerHTML = `
+                <div class="background-toggle-row">
+                    <button class="background-toggle-button ${!mapEnabled ? "active" : ""}" type="button" data-background-mode="plain">Plain</button>
+                    <button class="background-toggle-button ${mapEnabled ? "active" : ""}" type="button" data-background-mode="map" ${mapIsAvailable ? "" : "disabled"}>Map</button>
+                </div>
+                <div class="background-toggle-detail">
+                    ${mapIsAvailable
+                        ? escapeHtml(mapDetail)
+                        : "Map background is unavailable in this session, so the app will keep the plain background."}
+                </div>
+            `;
+            backgroundModeCard.querySelectorAll("[data-background-mode]").forEach((button) => {
+                button.addEventListener("click", () => setBackgroundMode(button.getAttribute("data-background-mode")));
+            });
+        }
+
+        function formatAge(value) {
+            if (!value) return "Initializing";
+            const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+            if (!Number.isFinite(seconds)) return "Initializing";
+            if (seconds < 60) return `${seconds} seconds`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes`;
+            return `${Math.floor(seconds / 3600)} hours`;
+        }
+
+        function formatUsdInput(value) {
+            return new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+                maximumFractionDigits: 0,
+            }).format(Number(value || 0));
+        }
+
+        function parseCurrencyInput(value) {
+            const normalized = String(value ?? "").replace(/[^0-9.]/g, "");
+            if (!normalized) return NaN;
+            return Number(normalized);
+        }
+
+        function decisionReasonDetail(decision) {
+            if (!decision) return "-";
+            const base = decision.decision_reason || "-";
+            return base === "Other" && decision.decision_reason_other
+                ? `${base}: ${decision.decision_reason_other}`
+                : base;
+        }
+
+        function humanizeValue(value) {
+            return String(value || "")
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (char) => char.toUpperCase()) || "-";
+        }
+
+        function evidenceStep(detail, type) {
+            const item = (detail?.evidence_ladder || []).find((entry) => entry.evidence_type === type) || null;
+            const timestamp = item?.provenance?.timestamp || item?.freshness_timestamp || null;
+            return {
+                type,
+                title: type.charAt(0) + type.slice(1).toLowerCase(),
+                status: item?.provenance?.status || item?.status || "Initializing",
+                confidence: item?.provenance?.confidence || item?.confidence || "Initializing",
+                freshness: item ? (item?.provenance?.age_label || formatAge(timestamp)) : "Initializing",
+            };
+        }
+
+        function findPolicyCheck(detail, label) {
+            return (detail?.policy_checks || []).find((item) => item.label === label) || null;
+        }
+
+        function deriveRunStatusIndicator(detail) {
+            const liquidityCheck = findPolicyCheck(detail, "Liquidity threshold");
+            const beneficiaryCheck = findPolicyCheck(detail, "Beneficiary review");
+            const freshnessCheck = findPolicyCheck(detail, "Measured data freshness");
+            const forecastCheck = findPolicyCheck(detail, "Forecast advisory");
+            const payrollDataState = detail?.payroll_data_state || {};
+            const killSwitchActive = String(detail?.system_state?.kill_switch || detail?.system_status?.kill_switch_status || "").toLowerCase() === "active";
+            const measuredDataStatus = String(detail?.system_state?.measured_data || detail?.measured_route_snapshot?.freshness_level || "").toLowerCase();
+            const measuredDataStale = measuredDataStatus === "stale" || freshnessCheck?.status === "fail";
+            const liquidityFail = liquidityCheck?.status === "fail";
+            const beneficiaryOpen = beneficiaryCheck?.status === "fail";
+            const payrollDataMissing = !payrollDataState?.last_loaded_timestamp || String(payrollDataState?.data_status || "").toLowerCase() === "missing_data";
+            const payrollReviewOpen = Number(payrollDataState?.beneficiary_change_count || 0) > 0 || String(payrollDataState?.verification_status || "").toLowerCase() === "review_required";
+            const demoDatasetActive = String(payrollDataState?.source_type || "").toLowerCase() === "demo";
+            const highRisk = String(detail?.risk_level || "").toUpperCase() === "HIGH";
+            const moderateRisk = String(detail?.risk_level || "").toUpperCase() === "MODERATE";
+            const manualReviewRequired = detail?.readiness_state === "REVIEW_REQUIRED" || detail?.recommended_action === "ESCALATE";
+            const counterpartyDataMissing = false;
+            const allReleaseConditionsMet = detail?.readiness_state === "READY_FOR_APPROVAL";
+            const complianceChecksPassed = beneficiaryCheck?.status === "pass";
+            const redReasons = [];
+            const yellowReasons = [];
+            const greenReasons = [];
+
+            if (killSwitchActive) {
+                redReasons.push("Kill switch active");
+            }
+            if (liquidityFail) {
+                redReasons.push("Liquidity below threshold");
+            }
+            if (beneficiaryOpen) {
+                redReasons.push("Beneficiary review open");
+            }
+            if (measuredDataStale) {
+                redReasons.push("Measured data stale");
+            }
+            if (payrollDataMissing) {
+                redReasons.push("Missing payroll data");
+            }
+            if (payrollReviewOpen && !redReasons.includes("Beneficiary review open")) {
+                redReasons.push("Beneficiary review open");
+            }
+
+            if (manualReviewRequired) {
+                yellowReasons.push("Manual review required");
+            }
+            if (moderateRisk) {
+                yellowReasons.push("Liquidity risk is moderate");
+            }
+            if (counterpartyDataMissing) {
+                yellowReasons.push("Counterparty data missing");
+            }
+            if (forecastCheck?.status === "warn") {
+                yellowReasons.push("Forecast advisory requires operator attention");
+            }
+
+            if (allReleaseConditionsMet) {
+                greenReasons.push("All release conditions met");
+            }
+            if (liquidityCheck?.status === "pass") {
+                greenReasons.push("Liquidity threshold met");
+            }
+            if (complianceChecksPassed) {
+                greenReasons.push("Compliance checks passed");
+            }
+            if (!measuredDataStale && (measuredDataStatus === "fresh" || freshnessCheck?.status === "pass")) {
+                greenReasons.push("Measured data fresh");
+            }
+            if (demoDatasetActive) {
+                greenReasons.push("Demo dataset active");
+            }
+
+            if (redReasons.length > 0 || highRisk || detail?.readiness_state === "HOLD") {
+                return {
+                    color: "red",
+                    label: "RED",
+                    headline: "High risk - Execution blocked",
+                    summary: "Critical readiness conditions are not met. Canopy should remain at the decision boundary until the blocking signals are cleared.",
+                    bullets: redReasons.length > 0 ? redReasons : ["High-risk blockers remain open"],
+                };
+            }
+
+            if (
+                (yellowReasons.length > 0 || manualReviewRequired || moderateRisk)
+                && !(allReleaseConditionsMet && liquidityCheck?.status === "pass" && complianceChecksPassed && !measuredDataStale)
+            ) {
+                return {
+                    color: "yellow",
+                    label: "YELLOW",
+                    headline: "Moderate risk - Manual review required",
+                    summary: "The run is not blocked by a critical stop condition, but operator review is still required before approval can be recorded.",
+                    bullets: yellowReasons.length > 0 ? [...new Set(yellowReasons)] : ["Manual review required"],
+                };
+            }
+
+            return {
+                color: "green",
+                label: "GREEN",
+                headline: "Low risk - Ready for approval",
+                summary: "Release conditions are satisfied and the run is aligned with the current readiness posture.",
+                bullets: greenReasons.length > 0 ? [...new Set(greenReasons)] : ["All release conditions met"],
+            };
+        }
+
+        function setupTransferAmountInput() {
+            const input = document.getElementById("transferAmountInput");
+            if (!input) return;
+            input.addEventListener("focus", () => {
+                const parsed = parseCurrencyInput(input.value);
+                input.value = Number.isFinite(parsed) ? String(parsed) : "";
+            });
+            input.addEventListener("blur", () => {
+                const parsed = parseCurrencyInput(input.value);
+                input.value = Number.isFinite(parsed) && parsed > 0 ? formatUsdInput(parsed) : formatUsdInput(100000);
+            });
+        }
+
+        async function pollMeasuredRefreshUntilSettled() {
+            while (true) {
+                const refreshControl = await fetchJson(`${API_BASE}/v1/measured-refresh-status`);
+                state.refreshControl = refreshControl;
+                renderSidebar();
+                if (refreshControl.status !== "querying") {
+                    break;
+                }
+                await new Promise((resolve) => window.setTimeout(resolve, 1000));
+            }
+            await loadWorkspace();
+        }
+
+        async function handleMeasuredRefresh() {
+            const refreshControl = await fetchJson(`${API_BASE}/v1/measured-refresh`, {
+                method: "POST",
+            });
+            state.refreshControl = refreshControl;
+            renderSidebar();
+            if (refreshControl.status === "querying") {
+                await pollMeasuredRefreshUntilSettled();
+            } else {
+                await loadWorkspace();
+            }
+        }
+
+        async function fileToBase64(file) {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            const chunkSize = 0x8000;
+            let binary = "";
+            for (let index = 0; index < bytes.length; index += chunkSize) {
+                binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+            }
+            return btoa(binary);
+        }
+
+        async function uploadPayrollFile(event) {
+            const file = event.target.files?.[0];
+            const message = document.getElementById("payrollDataMessage");
+            const sourceType = document.getElementById("payrollSourceTypeSelect")?.value || "upload";
+            if (!file) return;
+            message.textContent = "Uploading payroll dataset...";
+            try {
+                const contentBase64 = await fileToBase64(file);
+                await fetchJson(`${API_BASE}/v1/payroll-runs/${encodeURIComponent(state.selectedRunId)}/payroll-data-upload`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        source_type: sourceType,
+                        file_name: file.name,
+                        content_base64: contentBase64,
+                    }),
+                });
+                await loadWorkspace();
+                const refreshedMessage = document.getElementById("payrollDataMessage");
+                if (refreshedMessage) {
+                    refreshedMessage.textContent = "Payroll dataset received and compared to the last verified snapshot.";
+                }
+            } catch (error) {
+                message.textContent = `Could not load payroll file: ${error.message}`;
+            } finally {
+                event.target.value = "";
+            }
+        }
+
+        function renderSidebar() {
+            const runList = document.getElementById("runList");
+            const evidenceExplainer = document.getElementById("evidenceExplainer");
+            const modeCard = document.getElementById("modeCard");
+            const sidebarFootnote = document.getElementById("sidebarFootnote");
+            const refreshControlCard = document.getElementById("refreshControlCard");
+            const clientConfig = state.clientConfig || {};
+            const refreshControl = state.refreshControl || {
+                status: "idle",
+                label: "Not measured",
+                indicator: "gray",
+                last_measured_refresh: null,
+            };
+            modeCard.innerHTML = clientConfig.runtime_mode ? `
+                <div class="mini-card">
+                    <div class="mini-label">Mode</div>
+                    <div class="stat-value">${escapeHtml(clientConfig.runtime_mode_label)}</div>
+                    <div class="mini-detail">${escapeHtml(clientConfig.runtime_mode_note || "-")}</div>
+                </div>
+                ${(clientConfig.data_sources || []).map((item) => `
+                    <div class="mini-card">
+                        <div class="mini-label">Source</div>
+                        <div class="mini-detail">${escapeHtml(item)}</div>
+                    </div>
+                `).join("")}
+            ` : "";
+            refreshControlCard.innerHTML = `
+                <button class="sidebar-refresh-button" type="button" id="runReadinessButton" ${refreshControl.status === "querying" ? "disabled" : ""}>Run Readiness Check</button>
+                <div class="refresh-status">
+                    <div class="refresh-status-row">
+                        <span class="refresh-light ${escapeHtml(refreshControl.indicator || "gray")}"></span>
+                        <span>${escapeHtml(refreshControl.label || "Not measured")}</span>
+                    </div>
+                    <div class="mini-detail">Last measured refresh: ${escapeHtml(refreshControl.last_measured_refresh ? formatTimestamp(refreshControl.last_measured_refresh) : "Not measured")}</div>
+                    ${refreshControl.last_error ? `<div class="mini-detail">${escapeHtml(refreshControl.last_error)}</div>` : ""}
+                </div>
+            `;
+            sidebarFootnote.textContent = clientConfig.live_data_enabled
+                ? "Real mode waits for an operator-triggered BigQuery refresh. Request handlers still serve cached/materialized state after evidence is ready."
+                : "Demo mode is using seeded snapshots only. No BigQuery or Coinbase calls are made in this mode.";
+            runList.innerHTML = state.runs.map((run) => `
+                <button class="run-button ${run.id === state.selectedRunId ? "active" : ""}" type="button" data-run-id="${escapeHtml(run.id)}" ${run.id === state.selectedRunId ? 'aria-current="true"' : ""}>
+                    <div class="run-title">
+                        <span>${escapeHtml(run.corridor)}</span>
+                        <span class="chip ${statusClass(run.readiness_state)}">${escapeHtml(run.readiness_label)}</span>
+                    </div>
+                    <div class="run-meta">
+                        <span>${escapeHtml(run.client_name)}</span>
+                        <span>${escapeHtml(run.payroll_date)}</span>
+                        <span>${escapeHtml(run.recommended_action_label)}</span>
+                    </div>
+                </button>
+            `).join("");
+
+            evidenceExplainer.innerHTML = (state.overview?.evidence_explainer || []).map((item) => `
+                <div class="mini-card">
+                    <div class="mini-label">${escapeHtml(item.label)}</div>
+                    <div class="mini-detail">${escapeHtml(item.detail)}</div>
+                </div>
+            `).join("");
+            renderBackgroundModeCard();
+
+            runList.querySelectorAll("[data-run-id]").forEach((button) => {
+                button.addEventListener("click", () => selectRun(button.getAttribute("data-run-id")));
+            });
+            document.getElementById("runReadinessButton")?.addEventListener("click", handleMeasuredRefresh);
+        }
+
+        function renderMain() {
+            const app = document.getElementById("app");
+            const detail = state.detail;
+            const overview = state.overview;
+            if (state.isSwitchingRun) {
+                app.innerHTML = '<div class="loading">Loading new corridor data...</div>';
+                return;
+            }
+            if (!detail || !overview) {
+                app.innerHTML = '<div class="loading">Loading payroll readiness workspace...</div>';
+                return;
+            }
+
+            const route = detail.route_recommendation || {};
+            const buffer = detail.buffer_recommendation || {};
+            const forecast = detail.forecast_advisory || {};
+            const latestDecision = detail.latest_decision || {};
+            const queryFamilies = detail.query_posture?.families || [];
+            const runtimeMode = state.clientConfig || {};
+            const systemStatus = detail.system_status || {};
+            const systemState = detail.system_state || {};
+            const decisionSurface = detail.decision_surface || {};
+            const decisionRule = detail.decision_rule || {};
+            const decisionLog = detail.decision_log || [];
+            const forecastPath = detail.forecast_action_path || {};
+            const handoff = detail.handoff_record || {};
+            const journey = detail.journey_progress || [];
+            const decisionContext = detail.decision_context || {};
+            const routeComparison = detail.route_comparison || [];
+            const capitalImpact = detail.capital_impact || {};
+            const payrollDataState = detail.payroll_data_state || {};
+            const payrollValidationErrors = payrollDataState.validation_errors || [];
+            const blockingSummary = detail.blocking_summary || [];
+            const decisionFlipConditions = detail.decision_flip_conditions || [];
+            const alternativePaths = detail.alternative_paths || [];
+            const evidenceSteps = ["MEASURED", "CALCULATED", "MODELED", "FORECASTED"].map((type) => evidenceStep(detail, type));
+            const bufferReasons = buffer.top_buffer_drivers?.length
+                ? buffer.top_buffer_drivers
+                : (buffer.why_this_buffer ? [buffer.why_this_buffer] : []);
+            const selectedBufferPercent = buffer.override_buffer_percent != null
+                ? buffer.override_buffer_percent
+                : buffer.recommended_buffer_percent;
+            const activeCorridorName = detail.corridor || "Payroll corridor";
+            const activeCorridorLabel = detail.client_name || "Sample Merchant Settlement";
+            const activePayrollDate = detail.payroll_date || "Initializing";
+            const activeDecision = detail.readiness_label || "Initializing";
+            const activeRisk = detail.risk_label || "Initializing";
+            const displayDecision = decisionSurface.display_decision_label || activeDecision;
+            const bannerTone = ["red", "yellow", "green"].includes(decisionSurface.banner_tone) ? decisionSurface.banner_tone : "red";
+            const safeOperatingRange = capitalImpact.safe_operating_range || {};
+            const capitalDeltaDirection = capitalImpact.capital_delta_direction || "neutral";
+            const capitalDeltaAmount = capitalImpact.capital_delta_amount || 0;
+            const capitalDeltaLabel = capitalDeltaDirection === "released"
+                ? "Capital Released"
+                : capitalDeltaDirection === "required"
+                ? "Additional Prefunding Required"
+                : "Capital Change";
+            const capitalDeltaDetail = capitalDeltaDirection === "released"
+                ? "Current buffer exceeds the selected release posture."
+                : capitalDeltaDirection === "required"
+                ? "Selected buffer is above the current prefunding posture."
+                : "Selected buffer matches the current prefunding posture.";
+            const opportunityLabel = capitalDeltaDirection === "released" ? "Yield Opportunity" : "Prefunding Impact";
+            const opportunityValue = capitalDeltaDirection === "released"
+                ? formatUsd(capitalImpact.yield_opportunity_estimate_annual || 0)
+                : formatUsd(capitalImpact.additional_prefunding_required || 0);
+            const opportunityDetail = capitalDeltaDirection === "released"
+                ? (capitalImpact.yield_assumption_label || "Illustrative annual yield only.")
+                : capitalDeltaDirection === "required"
+                ? "Additional capital required to reach the selected operating buffer."
+                : "No incremental capital movement is required.";
+
+            app.innerHTML = `
+                <section class="panel">
+                    <div class="main-breadcrumb">
+                        <span>Dashboard</span>
+                        <span>/</span>
+                        <span>Payroll Runs</span>
+                        <span>/</span>
+                        <span>${escapeHtml(activeCorridorName)}</span>
+                    </div>
+                    <div class="decision-banner ${bannerTone}">
+                        <div class="decision-banner-header">
+                            <div>
+                                <div class="decision-banner-kicker">Decision Banner</div>
+                                <div class="decision-banner-title">${escapeHtml(activeCorridorName)} — ${escapeHtml(activeCorridorLabel)}</div>
+                                <div class="decision-banner-copy">${escapeHtml(decisionSurface.why_it_matters || detail.top_line_reason || "-")}</div>
+                            </div>
+                            <div class="run-status-pill">${escapeHtml(displayDecision)}</div>
+                        </div>
+                        <div class="decision-banner-grid">
+                            <div class="decision-banner-card">
+                                <div class="decision-banner-card-label">Display Decision</div>
+                                <div class="decision-banner-card-value">${escapeHtml(displayDecision)}</div>
+                            </div>
+                            <div class="decision-banner-card">
+                                <div class="decision-banner-card-label">System State</div>
+                                <div class="decision-banner-card-value">${escapeHtml(decisionSurface.system_state_label || "System healthy")}</div>
+                            </div>
+                            <div class="decision-banner-card">
+                                <div class="decision-banner-card-label">Corridor State</div>
+                                <div class="decision-banner-card-value">${escapeHtml(decisionSurface.corridor_state_label || activeDecision)}</div>
+                            </div>
+                            <div class="decision-banner-card">
+                                <div class="decision-banner-card-label">Payroll Date</div>
+                                <div class="decision-banner-card-value">${escapeHtml(activePayrollDate)}</div>
+                            </div>
+                        </div>
+                        <div class="decision-banner-detail-grid">
+                            <div class="decision-banner-card">
+                                <div class="decision-banner-card-label">Immediate Next Step</div>
+                                <div class="decision-banner-card-detail">${escapeHtml(decisionSurface.next_step || detail.recommended_next_action || "-")}</div>
+                            </div>
+                            <div class="decision-banner-card">
+                                <div class="decision-banner-card-label">Why This Matters</div>
+                                <div class="decision-banner-card-detail">${escapeHtml(decisionSurface.why_it_matters || detail.top_line_reason || "-")}</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Capital + Time Impact</div>
+                            <h2>Buffer, timing, and cash movement</h2>
+                            <p>Show the current, recommended, and selected release posture in dollar terms so the operator can see whether Canopy is releasing capital or requiring more prefunding.</p>
+                        </div>
+                    </div>
+                    <div class="impact-grid">
+                        <div class="mini-card">
+                            <div class="mini-label">Current Buffer</div>
+                            <div class="stat-value">${escapeHtml(formatPercent(capitalImpact.current_buffer_percent || 0))}</div>
+                            <div class="mini-detail">${escapeHtml(formatUsd(capitalImpact.current_buffer_amount || 0))}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">Recommended Buffer</div>
+                            <div class="stat-value">${escapeHtml(formatPercent(capitalImpact.recommended_buffer_percent || 0))}</div>
+                            <div class="mini-detail">${escapeHtml(formatUsd(capitalImpact.recommended_buffer_amount || 0))}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">Selected Buffer</div>
+                            <div class="stat-value">${escapeHtml(formatPercent(capitalImpact.selected_buffer_percent || 0))}</div>
+                            <div class="mini-detail">${escapeHtml(formatUsd(capitalImpact.selected_buffer_amount || 0))}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">${escapeHtml(capitalDeltaLabel)}</div>
+                            <div class="stat-value">${escapeHtml(formatUsd(capitalDeltaAmount || 0))}</div>
+                            <div class="mini-detail">${escapeHtml(capitalDeltaDetail)}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">${escapeHtml(opportunityLabel)}</div>
+                            <div class="stat-value">${escapeHtml(opportunityValue)}</div>
+                            <div class="mini-detail">${escapeHtml(opportunityDetail)}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">Operating Window</div>
+                            <div class="mini-detail">Effective deadline: ${escapeHtml(formatTimestampOrInitializing(capitalImpact.effective_deadline_at || decisionContext.effective_deadline_at || detail.cutoff_at))}</div>
+                            <div class="mini-detail">Time until cutoff: ${escapeHtml(formatDurationMinutes(capitalImpact.time_until_cutoff_minutes))}</div>
+                            <div class="mini-detail">Safe range: ${escapeHtml(`${formatPercent(safeOperatingRange.min_percent || buffer.safe_buffer_range_min || 0)} - ${formatPercent(safeOperatingRange.max_percent || buffer.safe_buffer_range_max || 0)}`)}</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="decision-change-grid">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">What Is Blocking Approval?</div>
+                                <h2>Ranked blockers</h2>
+                                <p>Each blocker is labeled by scope and evidence type so the operator can tell whether the hold is coming from the system or the corridor.</p>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            ${blockingSummary.map((item) => `
+                                <article class="mini-card">
+                                    <div class="run-title">
+                                        <h3>${escapeHtml(item.label)}</h3>
+                                        <span class="chip ${item.severity === "Critical" || item.severity === "High" ? "hold" : "review"}">${escapeHtml(item.severity)}</span>
+                                    </div>
+                                    <div class="mini-detail">${escapeHtml(item.why_blocking)}</div>
+                                    <div class="row-meta">
+                                        <span class="meta-pill">${escapeHtml(item.scope)} level</span>
+                                        <span class="meta-pill">${escapeHtml(item.evidence_type)}</span>
+                                        <span class="meta-pill">${escapeHtml(item.determinism)}</span>
+                                        <span class="meta-pill">Current: ${escapeHtml(item.current_state)}</span>
+                                        <span class="meta-pill">Target: ${escapeHtml(item.target_state)}</span>
+                                    </div>
+                                </article>
+                            `).join("") || '<div class="mini-card"><div class="mini-detail">No blocking conditions are currently open.</div></div>'}
+                        </div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">What Changes The Decision?</div>
+                                <h2>Flip conditions and alternative paths</h2>
+                                <p>Show the exact conditions that would flip HOLD to APPROVE, plus the best deterministic alternatives available to the operator right now.</p>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            <div class="mini-card">
+                                <div class="mini-label">Decision Flips When</div>
+                                <div class="simple-list">
+                                    ${decisionFlipConditions.map((item) => `
+                                        <div class="mini-card">
+                                            <div class="run-title">
+                                                <h3>${escapeHtml(item.label)}</h3>
+                                                <span class="meta-pill">${escapeHtml(item.scope)}</span>
+                                            </div>
+                                            <div class="mini-detail">${escapeHtml(item.why_it_flips)}</div>
+                                            <div class="row-meta">
+                                                <span class="meta-pill">Current: ${escapeHtml(item.current_state)}</span>
+                                                <span class="meta-pill">Target: ${escapeHtml(item.target_state)}</span>
+                                            </div>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Alternative Paths</div>
+                                <div class="simple-list">
+                                    ${alternativePaths.map((item) => `
+                                        <div class="mini-card">
+                                            <h3>${escapeHtml(item.action)}</h3>
+                                            <div class="mini-detail">${escapeHtml(item.likely_outcome)}</div>
+                                            <div class="mini-detail">Timing: ${escapeHtml(item.timing_impact)}</div>
+                                            <div class="mini-detail">Capital: ${escapeHtml(item.capital_impact)}</div>
+                                            <div class="mini-detail">Decision effect: ${escapeHtml(item.decision_effect)}</div>
+                                        </div>
+                                    `).join("") || '<div class="mini-card"><div class="mini-detail">No alternative paths are needed while the run is approvable.</div></div>'}
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="panel">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Evidence Ladder</div>
+                            <h2>Measured -> Calculated -> Modeled -> Forecasted</h2>
+                            <p>The evidence hierarchy stays visible, but incomplete measured states are labeled honestly so stale evidence is never confused with corridor truth.</p>
+                        </div>
+                    </div>
+                    <div class="evidence-ladder-bar">
+                        ${evidenceSteps.map((item) => `
+                            <article class="evidence-step">
+                                <div class="evidence-step-header">
+                                    <div class="evidence-step-title">${escapeHtml(item.title)}</div>
+                                    <span class="evidence-chip ${escapeHtml(item.type.toLowerCase())}">${escapeHtml(item.title)}</span>
+                                </div>
+                                <div class="mini-detail">Status: ${escapeHtml(item.status)}</div>
+                                <div class="mini-detail">Confidence: ${escapeHtml(item.confidence)}</div>
+                                <div class="mini-detail">Freshness: ${escapeHtml(item.freshness)}</div>
+                            </article>
+                        `).join("")}
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Decision Context</div>
+                            <h2>Controlled run simulation</h2>
+                            <p>Set the transfer inputs, reuse cached measured state, and run a new readiness evaluation without crossing the execution boundary.</p>
+                        </div>
+                    </div>
+                    <form id="evaluationForm" class="decision-actions">
+                        <div class="field">
+                            <label for="transferAmountInput">Transfer Amount (USD)</label>
+                            <input id="transferAmountInput" name="transfer_amount_usd" type="text" inputmode="decimal" required value="${escapeHtml(formatUsdInput(decisionContext.transfer_amount_usd || 100000))}">
+                        </div>
+                        <div class="field">
+                            <label for="arrivalDeadlineInput">Required Arrival Time</label>
+                            <input id="arrivalDeadlineInput" name="required_arrival_at" type="datetime-local" value="${escapeHtml(decisionContext.required_arrival_at ? new Date(decisionContext.required_arrival_at).toISOString().slice(0, 16) : "")}">
+                            <div class="mini-detail">Leave blank to use the default payroll cutoff.</div>
+                        </div>
+                        <div class="field">
+                            <label for="payrollCurrencySelect">Payroll Currency</label>
+                            <select id="payrollCurrencySelect" name="payroll_currency">
+                                ${["USD", "NGN", "ZAR", "BRL", "MXN", "PHP", "VND"].map((item) => `<option value="${item}" ${item === (decisionContext.payroll_currency || "USD") ? "selected" : ""}>${item}</option>`).join("")}
+                            </select>
+                            <div class="mini-detail">Transfer amount is evaluated in USD unless you explicitly change the payroll currency context.</div>
+                        </div>
+                        <div class="field">
+                            <label for="overrideBufferInput">Override Buffer %</label>
+                            <input id="overrideBufferInput" name="override_buffer_percent" type="number" min="0" max="100" step="0.1" value="${escapeHtml(decisionContext.override_buffer_percent != null ? Math.round(Number(decisionContext.override_buffer_percent) * 1000) / 10 : "")}">
+                            <div class="mini-detail">${escapeHtml(buffer.override_warning || "Optional. Use only when the operator needs to override the recommended buffer.")}</div>
+                        </div>
+                        <div class="mini-card" style="grid-column: 1 / -1;">
+                            <div class="mini-label">Payroll Data Source</div>
+                            <div class="three-col">
+                                <div class="field" style="margin: 0;">
+                                    <label for="payrollSourceTypeSelect">Source Type</label>
+                                    <select id="payrollSourceTypeSelect" name="payroll_source_type">
+                                        <option value="demo" ${payrollDataState.source_type === "demo" ? "selected" : ""}>Demo dataset</option>
+                                        <option value="upload" ${payrollDataState.source_type === "upload" ? "selected" : ""}>CSV upload</option>
+                                        <option value="api" ${payrollDataState.source_type === "api" ? "selected" : ""}>Sample merchant API</option>
+                                        <option value="sftp" ${payrollDataState.source_type === "sftp" ? "selected" : ""}>SFTP batch</option>
+                                        <option value="manual" ${payrollDataState.source_type === "manual" ? "selected" : ""}>Manual entry</option>
+                                    </select>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Last Data Load</div>
+                                    <div class="mini-detail">${escapeHtml(formatTimestampOrInitializing(payrollDataState.last_loaded_timestamp))}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Records Loaded</div>
+                                    <div class="mini-detail">${escapeHtml(payrollDataState.record_count_label || "0 beneficiaries")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Beneficiary Changes Detected</div>
+                                    <div class="mini-detail">${escapeHtml(String(payrollDataState.beneficiary_change_count ?? 0))}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Data Status</div>
+                                    <div class="mini-detail">${escapeHtml(payrollDataState.data_status_label || "Initializing")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Verification Status</div>
+                                    <div class="mini-detail">${escapeHtml(payrollDataState.verification_status_label || "Initializing")}</div>
+                                </div>
+                                <div class="mini-card" style="grid-column: 1 / -1;">
+                                    <div class="mini-label">Data Lineage</div>
+                                    <div class="mini-detail">${escapeHtml(payrollDataState.lineage_label || "Payroll dataset snapshot -> BigQuery -> Decision Engine")}</div>
+                                    <div class="mini-detail">${escapeHtml(payrollDataState.source_type === "demo" ? (payrollDataState.demo_mode_label || "Demo dataset active") : (payrollDataState.file_name ? `Latest file: ${payrollDataState.file_name}` : "Upload or sync a payroll dataset to compare against the last verified snapshot."))}</div>
+                                    <div class="mini-detail">${escapeHtml(payrollDataState.source_type === "demo" ? (payrollDataState.upload_status || "Not required") : "Upload status: Ready for ingestion")}</div>
+                                </div>
+                                ${payrollValidationErrors.length ? `
+                                    <div class="mini-card" style="grid-column: 1 / -1;">
+                                        <div class="mini-label">Validation</div>
+                                        <ul class="bullets">
+                                            ${payrollValidationErrors.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                                        </ul>
+                                    </div>
+                                ` : ""}
+                            </div>
+                            <div class="actions-row" style="margin-top: 16px;">
+                                <button class="ghost-button" type="button" id="uploadPayrollFileButton">Upload Payroll File</button>
+                                <input id="payrollFileInput" type="file" accept=".csv,.xlsx,.json" style="display:none;">
+                            </div>
+                            <div id="payrollDataMessage" class="message"></div>
+                        </div>
+                        <div class="actions-row">
+                            <button class="primary-button" type="submit">Run Readiness Check</button>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">Last evaluation</div>
+                            <div class="mini-detail">${escapeHtml(formatTimestampOrInitializing(detail.last_evaluation_at))}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">Effective deadline</div>
+                            <div class="mini-detail">${escapeHtml(formatTimestampOrInitializing(decisionContext.effective_deadline_at || detail.cutoff_at))}</div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="mini-label">Time sensitivity</div>
+                            <div class="mini-detail">${escapeHtml(decisionContext.time_sensitivity || "standard")}</div>
+                        </div>
+                        <div id="evaluationMessage" class="message"></div>
+                    </form>
+                </section>
+
+                <section class="two-col">
+                    <article class="panel hero-panel">
+                        <div class="eyebrow">System Evidence Posture</div>
+                        <h2 class="hero-title">${escapeHtml(decisionSurface.system_state_label || "System healthy")}</h2>
+                        <p class="hero-subtitle">${escapeHtml(systemState.evidence_posture_detail || detail.measured_route_snapshot?.evidence_posture_detail || detail.top_line_reason || "-")}</p>
+                        <div class="status-row">
+                            <span class="chip ${statusClass(detail.readiness_state)}">${escapeHtml(displayDecision)}</span>
+                            <span class="chip ${statusClass(detail.readiness_state)}">${escapeHtml(detail.risk_label)} risk</span>
+                            <span class="chip ${statusClass(detail.readiness_state)}">${escapeHtml(detail.measured_route_snapshot?.evidence_posture_label || "Measured evidence")}</span>
+                            <span class="meta-pill">${escapeHtml(runtimeMode.runtime_mode_label || "Mode unknown")}</span>
+                        </div>
+                        <div class="stat-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">System State</div>
+                                <div class="stat-value">${escapeHtml(decisionSurface.system_state_label || systemState.system_health || "-")}</div>
+                                <div class="stat-detail">${escapeHtml(systemState.evidence_posture_detail || "-")}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Corridor State</div>
+                                <div class="stat-value">${escapeHtml(decisionSurface.corridor_state_label || activeDecision)}</div>
+                                <div class="stat-detail">${escapeHtml(decisionSurface.next_step || detail.recommended_next_action || "-")}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Measured Refresh</div>
+                                <div class="stat-value">${escapeHtml(detail.measured_route_snapshot?.evidence_posture_label || detail.measured_route_snapshot?.freshness_level || "-")}</div>
+                                <div class="stat-detail">${escapeHtml(formatTimestampOrInitializing(detail.measured_route_snapshot?.freshness_timestamp))} | ${escapeHtml(detail.measured_route_snapshot?.provenance?.age_label || formatAge(detail.measured_route_snapshot?.freshness_timestamp))}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Measured Data Source</div>
+                                <div class="stat-value">${escapeHtml(systemStatus.measured_data_source || "-")}</div>
+                                <div class="stat-detail">${escapeHtml(systemStatus.request_path_note || "-")}</div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Data Health</div>
+                                <h2>Runtime status</h2>
+                            </div>
+                        </div>
+                        <div class="health-grid">
+                            <div class="mini-card">
+                                <div class="mini-label">Operating mode</div>
+                                <div class="stat-value">${escapeHtml(systemStatus.operating_mode || runtimeMode.runtime_mode_label || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Measured data source</div>
+                                <div class="mini-detail">${escapeHtml(systemStatus.measured_data_source || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Last measured refresh</div>
+                                <div class="mini-detail">${escapeHtml(formatTimestampOrInitializing(systemStatus.last_measured_refresh))}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Cache age</div>
+                                <div class="mini-detail">${escapeHtml(systemStatus.cache_age_seconds != null ? `${systemStatus.cache_age_seconds} seconds` : "Initializing")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Poll interval</div>
+                                <div class="mini-detail">${escapeHtml(systemStatus.poll_interval_minutes != null ? `${systemStatus.poll_interval_minutes} minutes` : "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Query status</div>
+                                <div class="mini-detail">${escapeHtml(systemStatus.query_status || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">BigQuery budget posture</div>
+                                <div class="mini-detail">${escapeHtml(systemStatus.bigquery_budget_posture || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Kill switch</div>
+                                <div class="mini-detail">${escapeHtml(systemStatus.kill_switch_status || "-")}</div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">System State</div>
+                                <h2>Lifecycle state</h2>
+                            </div>
+                        </div>
+                        <div class="health-grid">
+                            <div class="mini-card">
+                                <div class="mini-label">Measured data</div>
+                                <div class="mini-detail">${escapeHtml(systemState.evidence_posture_label || systemState.measured_data || "Initializing")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Forecast engine</div>
+                                <div class="mini-detail">${escapeHtml(systemState.forecast_engine || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Kill switch</div>
+                                <div class="mini-detail">${escapeHtml(systemState.kill_switch || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">System health</div>
+                                <div class="mini-detail">${escapeHtml(systemState.system_health || "-")}</div>
+                            </div>
+                            <div class="mini-card" style="grid-column: 1 / -1;">
+                                <div class="mini-label">Evidence posture detail</div>
+                                <div class="mini-detail">${escapeHtml(systemState.evidence_posture_detail || detail.measured_route_snapshot?.evidence_posture_detail || "-")}</div>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="panel">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Payroll Run Detail</div>
+                            <h2>${escapeHtml(detail.client_name)} - ${escapeHtml(detail.corridor)}</h2>
+                            <p>${escapeHtml(detail.top_line_reason)}</p>
+                        </div>
+                    </div>
+                    <div class="two-col">
+                        <div class="queue-card">
+                            <div class="stat-label">Top Answer</div>
+                            <div class="stat-value">${escapeHtml(detail.readiness_label)}</div>
+                            <div class="body-copy">${escapeHtml(detail.recommended_next_action)}</div>
+                            <div class="row-meta">
+                                <span class="meta-pill">Payroll date: ${escapeHtml(detail.payroll_date)}</span>
+                                <span class="meta-pill">Currency: ${escapeHtml(detail.currency)}</span>
+                                <span class="meta-pill">Cutoff: ${escapeHtml(formatTimestamp(detail.cutoff_at))}</span>
+                            </div>
+                        </div>
+                        <div class="queue-card">
+                            <div class="stat-label">Decision rule</div>
+                            <div class="body-copy"><strong>${escapeHtml(decisionRule.title || "-")}</strong></div>
+                            <div class="mini-detail">Condition: ${escapeHtml(decisionRule.condition || "-")}</div>
+                            <div class="mini-detail">Logic: ${escapeHtml(decisionRule.logic || "-")}</div>
+                            <div class="row-meta">
+                                <span class="meta-pill">Result: ${escapeHtml(decisionRule.result || "-")}</span>
+                                <span class="meta-pill">Action: ${escapeHtml(decisionRule.recommended_action || "-")}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="two-col" style="margin-top: 12px;">
+                        <div class="queue-card">
+                            <div class="stat-label">Top Blockers</div>
+                            <ul class="bullets">
+                                ${(detail.blockers || []).map((item) => `<li>${escapeHtml(item.label)} (${escapeHtml(item.evidence_type)})</li>`).join("") || "<li>No open blockers.</li>"}
+                            </ul>
+                        </div>
+                        <div class="queue-card">
+                            <div class="stat-label">Decision log</div>
+                            <div class="simple-list">
+                                ${(decisionLog || []).map((item) => `
+                                    ${item.entry_type === "payroll_data_event" ? `
+                                        <div class="mini-card">
+                                            <div class="mini-detail">Time: ${escapeHtml(formatTimestampOrInitializing(item.decision_timestamp))}</div>
+                                            <div class="mini-detail">Event: ${escapeHtml(item.event_name || "Payroll file loaded")}</div>
+                                            <div class="mini-detail">Records: ${escapeHtml(String(item.record_count ?? 0))}</div>
+                                            <div class="mini-detail">Changes detected: ${escapeHtml(String(item.beneficiary_change_count ?? 0))}</div>
+                                            <div class="mini-detail">Source: ${escapeHtml(item.source_type_label || humanizeValue(item.source_type))}</div>
+                                            <div class="mini-detail">File: ${escapeHtml(item.file_name || "-")}</div>
+                                        </div>
+                                    ` : `
+                                        <div class="mini-card">
+                                            <div class="mini-detail">Time: ${escapeHtml(formatTimestampOrInitializing(item.decision_timestamp))}</div>
+                                            <div class="mini-detail">Action: ${escapeHtml(item.decision_action || "-")}</div>
+                                            <div class="mini-detail">Reason: ${escapeHtml(decisionReasonDetail(item))}</div>
+                                            <div class="mini-detail">Rule: ${escapeHtml(item.decision_rule || "-")}</div>
+                                            <div class="mini-detail">Recorded by: ${escapeHtml(item.decision_owner || "-")}</div>
+                                        </div>
+                                    `}
+                                `).join("") || '<div class="mini-card"><div class="mini-detail">No recorded decisions yet.</div></div>'}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Evidence Detail</div>
+                            <h2>Measured -> calculated -> modeled -> forecasted detail</h2>
+                            <p>Every major signal still shows its provenance and freshness so the operator can inspect the decision basis in full.</p>
+                        </div>
+                    </div>
+                    <div class="evidence-grid">
+                        ${(detail.evidence_ladder || []).map((item) => `
+                            <article class="ladder-card">
+                                <span class="evidence-chip ${escapeHtml(item.evidence_type.toLowerCase())}">${escapeHtml(item.evidence_type)}</span>
+                                <h3>${escapeHtml(item.title)}</h3>
+                                <div class="ladder-value">${escapeHtml(item.value)}</div>
+                                <p>${escapeHtml(item.detail)}</p>
+                                <div class="row-meta">
+                                    <span class="meta-pill">Source: ${escapeHtml(item.provenance?.source || "-")}</span>
+                                    <span class="meta-pill">Timestamp: ${escapeHtml(formatTimestampOrInitializing(item.provenance?.timestamp))}</span>
+                                    <span class="meta-pill">Age: ${escapeHtml(item.provenance?.age_label || formatAge(item.provenance?.timestamp))}</span>
+                                    <span class="meta-pill">Confidence: ${escapeHtml(item.provenance?.confidence || "-")}</span>
+                                    <span class="meta-pill">Status: ${escapeHtml(item.provenance?.status || "Initializing")}</span>
+                                </div>
+                            </article>
+                        `).join("")}
+                    </div>
+                </section>
+
+                <section class="route-grid">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Route Module</div>
+                                <h2>Modeled route recommendation</h2>
+                            </div>
+                        </div>
+                        <div class="three-col">
+                            <div class="stat-card">
+                                <div class="stat-label">Recommended rail</div>
+                                <div class="stat-value">${escapeHtml(route.recommended_rail || "-")}</div>
+                                <div class="stat-detail">${escapeHtml(route.provenance?.source || "-")}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Fallback rail</div>
+                                <div class="stat-value">${escapeHtml(route.alternative_rail || "-")}</div>
+                                <div class="stat-detail">Keep available if measured liquidity deteriorates.</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Strategy score</div>
+                                <div class="stat-value">${escapeHtml(route.strategy_score_label || "-")}</div>
+                                <div class="stat-detail">${escapeHtml(route.expected_landed_amount_label || "-")} landed</div>
+                            </div>
+                        </div>
+                        <div class="row-meta">
+                            <span class="meta-pill">Timestamp: ${escapeHtml(formatTimestampOrInitializing(route.provenance?.timestamp))}</span>
+                            <span class="meta-pill">Age: ${escapeHtml(route.provenance?.age_label || formatAge(route.provenance?.timestamp))}</span>
+                            <span class="meta-pill">Confidence: ${escapeHtml(route.provenance?.confidence || "-")}</span>
+                            <span class="meta-pill">Status: ${escapeHtml(route.provenance?.status || "Initializing")}</span>
+                        </div>
+                        <ul class="bullets">
+                            <li>${escapeHtml(route.reason || "No route narrative available.")}</li>
+                            <li>${escapeHtml(detail.approval_boundary_note)}</li>
+                        </ul>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Route Comparison</div>
+                                <h2>Settlement economics by rail</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            ${(routeComparison || []).map((item) => `
+                                <div class="mini-card">
+                                    <div class="mini-label">${escapeHtml(item.rail || "-")}</div>
+                                    <div class="mini-detail">Network fee: ${escapeHtml(formatUsd(item.network_fee_usd, 2))}</div>
+                                    <div class="mini-detail">Routing fee: ${escapeHtml(formatUsd(item.routing_fee_usd, 2))}</div>
+                                    <div class="mini-detail">Total fee: ${escapeHtml(formatUsd(item.total_fee_usd, 2))}</div>
+                                    <div class="mini-detail">Estimated arrival: ${escapeHtml(item.estimated_arrival_label || "-")}</div>
+                                    <div class="mini-detail">Confidence: ${escapeHtml(item.confidence_score_label || "-")}</div>
+                                    <div class="mini-detail">Timestamp: ${escapeHtml(formatTimestampOrInitializing(item.timestamp))} | ${escapeHtml(item.age_label || formatAge(item.timestamp))} | ${escapeHtml(item.status || "Initializing")}</div>
+                                </div>
+                            `).join("") || '<div class="mini-card"><div class="mini-detail">No route comparison is available yet.</div></div>'}
+                        </div>
+                    </article>
+                </section>
+
+                <section class="two-col">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Buffer Module</div>
+                                <h2>Calculated release posture</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            <div class="mini-card">
+                                <div class="mini-label">Buffer recommendation</div>
+                                <div class="stat-value">${escapeHtml(`${formatPercent(buffer.recommended_buffer_percent || 0)} target buffer`)}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Confidence</div>
+                                <div class="mini-detail">${escapeHtml(buffer.provenance?.confidence || "Initializing")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Reason</div>
+                                <ul class="buffer-reason-list">
+                                    ${bufferReasons.map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>No buffer rationale is available.</li>"}
+                                </ul>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Safe operating range</div>
+                                <div class="stat-value">${escapeHtml(`${formatPercent(buffer.safe_buffer_range_min || 0)} - ${formatPercent(buffer.safe_buffer_range_max || 0)}`)}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Selected value</div>
+                                <div class="stat-value">${escapeHtml(formatPercent(selectedBufferPercent || 0))}</div>
+                                <div class="mini-detail">${escapeHtml(buffer.override_buffer_percent != null ? "Manual override is active." : "Recommended value is active.")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Current prefunding</div>
+                                <div class="stat-value">${escapeHtml(formatUsd(buffer.current_prefunding_amount || 0))}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Override buffer</div>
+                                <div class="mini-detail">${escapeHtml(buffer.override_buffer_percent != null ? formatPercent(buffer.override_buffer_percent) : "None")}</div>
+                                <div class="mini-detail">${escapeHtml(buffer.override_warning || "Recommended buffer is active.")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Signal provenance</div>
+                                <div class="mini-detail">
+                                    ${escapeHtml(buffer.provenance?.source || "-")} | ${escapeHtml(formatTimestampOrInitializing(buffer.provenance?.timestamp))} | ${escapeHtml(buffer.provenance?.age_label || formatAge(buffer.provenance?.timestamp))} | ${escapeHtml(buffer.provenance?.status || "Initializing")}
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Journey Sequence</div>
+                                <h2>Receive funding -> evaluate -> decide -> handoff</h2>
+                            </div>
+                        </div>
+                        <div class="three-col">
+                            ${(journey || []).map((item) => `
+                                <div class="mini-card">
+                                    <div class="mini-label">${escapeHtml(item.state)}</div>
+                                    <div class="mini-detail">${escapeHtml(item.label)}</div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </article>
+                </section>
+
+                <section class="two-col">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Forecast Section</div>
+                                <h2>Next-state logic</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            <div class="mini-card">
+                                <div class="mini-label">Forecast scenario</div>
+                                <div class="mini-detail">${escapeHtml(forecastPath.forecast_scenario || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Next expected state</div>
+                                <div class="mini-detail">${escapeHtml(forecastPath.next_expected_state || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Trigger condition</div>
+                                <div class="mini-detail">${escapeHtml(forecastPath.trigger_condition || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Escalation condition</div>
+                                <div class="mini-detail">${escapeHtml(forecastPath.escalation_condition || "-")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Forecast provenance</div>
+                                <div class="mini-detail">
+                                    ${escapeHtml(forecast.provenance?.source || "-")} | ${escapeHtml(formatTimestampOrInitializing(forecast.provenance?.timestamp))} | ${escapeHtml(forecast.provenance?.age_label || formatAge(forecast.provenance?.timestamp))} | ${escapeHtml(forecast.provenance?.status || "Initializing")}
+                                </div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Kill switch behavior</div>
+                                <div class="mini-detail">${escapeHtml((systemState.kill_switch_explainer || []).join(" | "))}</div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Policy Results</div>
+                                <h2>Thresholds and actuals</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            ${(detail.policy_checks || []).map((item) => `
+                                <div class="mini-card">
+                                    <div class="mini-label">${escapeHtml(item.label)}</div>
+                                    <div class="mini-detail">Threshold: ${escapeHtml(item.policy_threshold_label || "-")}</div>
+                                    <div class="mini-detail">Actual: ${escapeHtml(item.actual_value_label || "-")}</div>
+                                    <div class="mini-detail">Trigger: ${escapeHtml(item.decision_trigger || "-")}</div>
+                                    <div class="mini-detail">Source: ${escapeHtml(item.provenance?.source || "-")} | ${escapeHtml(formatTimestampOrInitializing(item.provenance?.timestamp))} | ${escapeHtml(item.provenance?.age_label || formatAge(item.provenance?.timestamp))}</div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </article>
+                </section>
+
+                <section class="two-col">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Exceptions</div>
+                                <h2>Operational workbench</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            ${(state.exceptions || []).map((item) => `
+                                <article class="exception-card">
+                                    <div class="run-title">
+                                        <h3>${escapeHtml(item.summary)}</h3>
+                                        <span class="chip ${statusClass(item.severity === "HIGH" ? "HOLD" : "REVIEW_REQUIRED")}">${escapeHtml(item.severity)}</span>
+                                    </div>
+                                    <p>${escapeHtml(item.why_it_matters)}</p>
+                                    <div class="row-meta">
+                                        <span class="meta-pill">${escapeHtml(item.owner)}</span>
+                                        <span class="meta-pill">${escapeHtml(item.recommended_next_step)}</span>
+                                        <span class="meta-pill">${escapeHtml(item.evidence_type)}</span>
+                                    </div>
+                                </article>
+                            `).join("") || '<div class="exception-card"><h3>No open exceptions</h3><p>This run currently has no open exceptions.</p></div>'}
+                        </div>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Changes Since Last Run</div>
+                                <h2>What changed</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            ${(detail.changes_since_last_run || []).map((item) => `
+                                <article class="change-card">
+                                    <h3>${escapeHtml(item.change_type)}</h3>
+                                    <p>${escapeHtml(item.summary)}</p>
+                                    <div class="row-meta">
+                                        <span class="meta-pill">Was: ${escapeHtml(item.old_value)}</span>
+                                        <span class="meta-pill">Now: ${escapeHtml(item.new_value)}</span>
+                                        <span class="meta-pill">${escapeHtml(item.materiality)}</span>
+                                    </div>
+                                </article>
+                            `).join("") || '<div class="change-card"><h3>No material changes</h3><p>No material deltas were detected versus the previous run.</p></div>'}
+                        </div>
+                    </article>
+                </section>
+
+                <section class="two-col">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">Decision Action</div>
+                                <h2>Review -> decide -> record</h2>
+                                <p>Record the operator action inside Canopy. Execution remains outside the product.</p>
+                            </div>
+                        </div>
+                        <form id="decisionForm" class="decision-actions">
+                            <div class="field">
+                                <label for="actionSelect">Action</label>
+                                <select id="actionSelect" name="action">
+                                    <option value="APPROVE" ${latestDecision.action === "APPROVE" ? "selected" : ""}>Approve</option>
+                                    <option value="HOLD" ${(latestDecision.action || "HOLD") === "HOLD" ? "selected" : ""}>Hold</option>
+                                    <option value="ESCALATE" ${latestDecision.action === "ESCALATE" ? "selected" : ""}>Escalate</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="approverInput">Recorded By</label>
+                                <input id="approverInput" name="approver" value="${escapeHtml(latestDecision.approver || "Operations")}">
+                            </div>
+                            <div class="field">
+                                <label for="reasonSelect">Decision Reason</label>
+                                <select id="reasonSelect" name="decision_reason">
+                                    ${(detail.decision_reason_options || []).map((item) => `<option value="${escapeHtml(item)}" ${item === (latestDecision.decision_reason || "Liquidity below threshold") ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                                </select>
+                            </div>
+                            <div class="field" id="otherReasonField" style="${(latestDecision.decision_reason || "") === "Other" ? "" : "display:none;"}">
+                                <label for="reasonOtherInput">Other reason detail</label>
+                                <textarea id="reasonOtherInput" name="decision_reason_other">${escapeHtml(latestDecision.decision_reason_other || detail.operator_notes || "")}</textarea>
+                            </div>
+                            <div class="actions-row">
+                                <button class="primary-button" type="submit">Record Decision</button>
+                                <button class="ghost-button" type="button" id="handoffButton">Send Approved Handoff</button>
+                                <button class="ghost-button" type="button" id="exportReceiptButton">Export Decision Receipt (.txt)</button>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Handoff status</div>
+                                <div class="mini-detail">${escapeHtml(handoff.status || "Await approval")}</div>
+                                <div class="mini-detail">${escapeHtml(handoff.boundary_note || "This action sends the approved decision to the execution system. Execution remains outside Canopy.")}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Decision boundary</div>
+                                <div class="mini-detail">Approve or Hold decision happens here.</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">Execution layer</div>
+                                <div class="mini-detail">Await approval -> Execute payment -> Confirm settlement</div>
+                                <div class="mini-detail">Execution handled by external payment rail.</div>
+                            </div>
+                            <div id="decisionMessage" class="message">${escapeHtml(state.decisionFlashMessage || "")}</div>
+                        </form>
+                    </article>
+
+                    <article class="panel">
+                        <div class="section-heading">
+                            <div>
+                                <div class="eyebrow">How This Is Powered</div>
+                                <h2>Cache-backed measured evidence</h2>
+                            </div>
+                        </div>
+                        <div class="simple-list">
+                            ${(detail.powered_by?.items || []).map((item) => `
+                                <div class="mini-card">
+                                    <div class="mini-detail">${escapeHtml(item)}</div>
+                                </div>
+                            `).join("")}
+                            <div class="mini-card">
+                                <div class="mini-label">Measured snapshot</div>
+                                <div class="mini-detail">${escapeHtml(formatTimestampOrInitializing(detail.query_posture?.measured_snapshot_at))}</div>
+                            </div>
+                            <div class="mini-card">
+                                <div class="mini-label">BigQuery posture</div>
+                                <div class="mini-detail">${escapeHtml(detail.query_posture?.request_path_note || "-")}</div>
+                            </div>
+                            ${(queryFamilies || []).map((family) => `
+                                <div class="mini-card">
+                                    <div class="mini-label">${escapeHtml(family.family)}</div>
+                                    <div class="mini-detail">${escapeHtml(family.summary)}</div>
+                                </div>
+                            `).join("")}
+                            <div class="mini-card">
+                                <div class="mini-label">Forecast advisory</div>
+                                <div class="mini-detail">
+                                    ${escapeHtml(forecast.detail || "Advisory only.")}
+                                    Status: ${escapeHtml(forecast.status || "-")}.
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+            `;
+
+            document.getElementById("evaluationForm").addEventListener("submit", handleEvaluationSubmit);
+            document.getElementById("decisionForm").addEventListener("submit", handleDecisionSubmit);
+            document.getElementById("handoffButton").addEventListener("click", triggerHandoff);
+            document.getElementById("exportReceiptButton").addEventListener("click", exportDecisionReceipt);
+            document.getElementById("reasonSelect").addEventListener("change", toggleOtherReasonField);
+            document.getElementById("uploadPayrollFileButton")?.addEventListener("click", () => {
+                document.getElementById("payrollFileInput")?.click();
+            });
+            document.getElementById("payrollFileInput")?.addEventListener("change", uploadPayrollFile);
+            setupTransferAmountInput();
+            toggleOtherReasonField();
+        }
+
+        function toggleOtherReasonField() {
+            const reasonSelect = document.getElementById("reasonSelect");
+            const otherReasonField = document.getElementById("otherReasonField");
+            if (!reasonSelect || !otherReasonField) return;
+            otherReasonField.style.display = reasonSelect.value === "Other" ? "" : "none";
+        }
+
+        async function loadWorkspace() {
+            const [overview, runs, clientConfig, refreshControl] = await Promise.all([
+                fetchJson(`${API_BASE}/v1/overview`),
+                fetchJson(`${API_BASE}/v1/payroll-runs`),
+                fetchJson(`${API_BASE}/v1/client-config`),
+                fetchJson(`${API_BASE}/v1/measured-refresh-status`),
+            ]);
+            state.overview = overview;
+            state.runs = runs.items || [];
+            state.clientConfig = clientConfig;
+            state.refreshControl = refreshControl;
+            state.selectedRunId = state.selectedRunId || state.runs[0]?.id || null;
+            state.mapAvailable = Boolean(clientConfig.mapbox_token_present && window.mapboxgl && !state.mapLoadFailed);
+            renderSidebar();
+            await selectRun(state.selectedRunId, false);
+        }
+
+        async function selectRun(runId, rerenderSidebar = true) {
+            if (!runId) return;
+            console.log("Corridor changed:", runId);
+            state.selectedRunId = runId;
+            state.isSwitchingRun = true;
+            state.pendingRunRequestId += 1;
+            const requestId = state.pendingRunRequestId;
+            if (rerenderSidebar) {
+                renderSidebar();
+            }
+            renderMain();
+            try {
+                const [detail, exceptions] = await Promise.all([
+                    fetchJson(`${API_BASE}/v1/payroll-runs/${encodeURIComponent(runId)}`),
+                    fetchJson(`${API_BASE}/v1/exceptions?run_id=${encodeURIComponent(runId)}`),
+                ]);
+                if (requestId !== state.pendingRunRequestId) {
+                    return;
+                }
+                state.detail = detail;
+                state.exceptions = exceptions.items || [];
+                state.isSwitchingRun = false;
+                console.log("Overview loaded for:", runId);
+                renderSidebar();
+                renderMain();
+                syncBackgroundPresentation({ animate: rerenderSidebar });
+            } catch (error) {
+                if (requestId !== state.pendingRunRequestId) {
+                    return;
+                }
+                state.isSwitchingRun = false;
+                renderSidebar();
+                renderMain();
+                throw error;
+            }
+        }
+
+        async function handleEvaluationSubmit(event) {
+            event.preventDefault();
+            const message = document.getElementById("evaluationMessage");
+            const form = new FormData(event.currentTarget);
+            message.textContent = "Running readiness check...";
+            const rawDeadline = form.get("required_arrival_at");
+            const rawOverride = form.get("override_buffer_percent");
+            const transferAmount = parseCurrencyInput(form.get("transfer_amount_usd"));
+            if (!Number.isFinite(transferAmount) || transferAmount <= 0) {
+                message.textContent = "Enter a valid USD transfer amount.";
+                return;
+            }
+            try {
+                await fetchJson(`${API_BASE}/v1/payroll-runs/${encodeURIComponent(state.selectedRunId)}/evaluate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        transfer_amount_usd: transferAmount,
+                        required_arrival_at: rawDeadline ? new Date(rawDeadline).toISOString() : null,
+                        payroll_currency: form.get("payroll_currency"),
+                        override_buffer_percent: rawOverride ? Number(rawOverride) : null,
+                    }),
+                });
+                await loadWorkspace();
+                message.textContent = "Readiness evaluation updated.";
+            } catch (error) {
+                message.textContent = `Could not run readiness check: ${error.message}`;
+            }
+        }
+
+        async function handleDecisionSubmit(event) {
+            event.preventDefault();
+            const message = document.getElementById("decisionMessage");
+            const form = new FormData(event.currentTarget);
+            message.textContent = "Recording decision...";
+            try {
+                await fetchJson(`${API_BASE}/v1/payroll-runs/${encodeURIComponent(state.selectedRunId)}/decision`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        action: form.get("action"),
+                        approver: form.get("approver"),
+                        decision_reason: form.get("decision_reason"),
+                        decision_reason_other: form.get("decision_reason_other") || "",
+                    }),
+                });
+                state.decisionFlashMessage = "Decision recorded successfully\nReceipt available for export";
+                await loadWorkspace();
+            } catch (error) {
+                message.textContent = `Could not record the decision: ${error.message}`;
+            }
+        }
+
+        async function triggerHandoff() {
+            const message = document.getElementById("decisionMessage");
+            message.textContent = "Sending approved handoff...";
+            try {
+                await fetchJson(`${API_BASE}/v1/payroll-runs/${encodeURIComponent(state.selectedRunId)}/handoff`, {
+                    method: "POST",
+                });
+                await loadWorkspace();
+                message.textContent = "Handoff acknowledged. Execution remains outside Canopy.";
+            } catch (error) {
+                message.textContent = `Could not trigger handoff: ${error.message}`;
+            }
+        }
+
+        async function exportDecisionReceipt() {
+            const message = document.getElementById("decisionMessage");
+            message.textContent = "Exporting decision receipt...";
+            try {
+                const response = await fetch(`${API_BASE}/v1/payroll-runs/${encodeURIComponent(state.selectedRunId)}/decision-receipt`);
+                if (!response.ok) {
+                    const payload = await response.text();
+                    throw new Error(payload || `Request failed with ${response.status}`);
+                }
+                const receiptText = await response.text();
+                const blob = new Blob([receiptText], { type: "text/plain;charset=utf-8" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = buildPayrollReceiptFilename(state.detail);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+                message.textContent = "Decision receipt exported.";
+            } catch (error) {
+                message.textContent = `Could not export receipt: ${error.message}`;
+            }
+        }
+
+        loadWorkspace().catch((error) => {
+            document.getElementById("app").innerHTML = `
+                <section class="panel">
+                    <div class="eyebrow">Error</div>
+                    <h2>Could not load payroll readiness workspace</h2>
+                    <p class="body-copy">${escapeHtml(error.message)}</p>
+                </section>
+            `;
+            syncBackgroundPresentation({ animate: false });
+        });
+
+        window.addEventListener("resize", () => {
+            if (state.mapInstance) {
+                state.mapInstance.resize();
+            }
+        });
+    </script>
+</body>
+</html>

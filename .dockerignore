@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.venv
+venv
+__pycache__
+*.py[cod]
+.DS_Store
+service-account.json
+.git
+.pytest_cache
+data/*.sqlite3
+tmp

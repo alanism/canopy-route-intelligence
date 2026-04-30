@@ -1,0 +1,26 @@
+[
+  {
+    "chain": "Ethereum",
+    "contract_address": "0x3ee18b2214aff97000d974cf647e7c347e8fa585",
+    "bridge_name": "Wormhole Token Bridge",
+    "bridge_type": "bridge"
+  },
+  {
+    "chain": "Ethereum",
+    "contract_address": "0x66a71dcef29a0ffbdbe3c6a460a3b5bc225cd675",
+    "bridge_name": "LayerZero Endpoint",
+    "bridge_type": "bridge"
+  },
+  {
+    "chain": "Polygon",
+    "contract_address": "0x5a58505a96d1dbf8df91cb21b54419fc36e93fde",
+    "bridge_name": "Wormhole Token Bridge",
+    "bridge_type": "bridge"
+  },
+  {
+    "chain": "Polygon",
+    "contract_address": "0x3c2269811836af69497e5f486a85d7316753cf62",
+    "bridge_name": "LayerZero Endpoint",
+    "bridge_type": "bridge"
+  }
+]

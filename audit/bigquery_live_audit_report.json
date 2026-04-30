@@ -1,0 +1,278 @@
+{
+  "checks": {
+    "context_graph_live_parity": {
+      "notes": [
+        "Context-graph parity uses live BigQuery edge extraction in non-request-path audit mode.",
+        "The legacy comparator reconstructs grouped-edge semantics from the same raw fact rows."
+      ],
+      "sampled_entities": [
+        {
+          "fields_compared": [
+            "topology",
+            "topology_classification",
+            "flow_density",
+            "protocol_noise_ratio",
+            "bridge_usage_rate",
+            "counterparty_entropy",
+            "liquidity_gap",
+            "total_transactions",
+            "edges",
+            "evidence_stack"
+          ],
+          "intentional_deltas": [
+            "Registry matching and entity labeling now occur in Python rather than SQL."
+          ],
+          "mismatches": [],
+          "notes": [
+            "Current snapshot built from live raw edge facts queried from BigQuery.",
+            "Legacy-equivalent snapshot reconstructed by grouping those facts before graph assembly.",
+            "Materialized snapshot exists for this sampled scope."
+          ],
+          "scope": {
+            "chain": "Ethereum",
+            "requested_time_range": "1h",
+            "resolved_time_range": "1h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        },
+        {
+          "fields_compared": [
+            "topology",
+            "topology_classification",
+            "flow_density",
+            "protocol_noise_ratio",
+            "bridge_usage_rate",
+            "counterparty_entropy",
+            "liquidity_gap",
+            "total_transactions",
+            "edges",
+            "evidence_stack"
+          ],
+          "intentional_deltas": [
+            "Registry matching and entity labeling now occur in Python rather than SQL."
+          ],
+          "mismatches": [],
+          "notes": [
+            "Current snapshot built from live raw edge facts queried from BigQuery.",
+            "Legacy-equivalent snapshot reconstructed by grouping those facts before graph assembly."
+          ],
+          "scope": {
+            "chain": "Ethereum",
+            "requested_time_range": "24h",
+            "resolved_time_range": "24h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        },
+        {
+          "fields_compared": [
+            "topology",
+            "topology_classification",
+            "flow_density",
+            "protocol_noise_ratio",
+            "bridge_usage_rate",
+            "counterparty_entropy",
+            "liquidity_gap",
+            "total_transactions",
+            "edges",
+            "evidence_stack"
+          ],
+          "intentional_deltas": [
+            "Registry matching and entity labeling now occur in Python rather than SQL."
+          ],
+          "mismatches": [],
+          "notes": [
+            "Current snapshot built from live raw edge facts queried from BigQuery.",
+            "Legacy-equivalent snapshot reconstructed by grouping those facts before graph assembly."
+          ],
+          "scope": {
+            "chain": "Polygon",
+            "requested_time_range": "1h",
+            "resolved_time_range": "1h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        },
+        {
+          "fields_compared": [
+            "topology",
+            "topology_classification",
+            "flow_density",
+            "protocol_noise_ratio",
+            "bridge_usage_rate",
+            "counterparty_entropy",
+            "liquidity_gap",
+            "total_transactions",
+            "edges",
+            "evidence_stack"
+          ],
+          "intentional_deltas": [
+            "Registry matching and entity labeling now occur in Python rather than SQL."
+          ],
+          "mismatches": [],
+          "notes": [
+            "Current snapshot built from live raw edge facts queried from BigQuery.",
+            "Legacy-equivalent snapshot reconstructed by grouping those facts before graph assembly.",
+            "Budget-safe fallback resolved requested 24h to 1h for Polygon."
+          ],
+          "scope": {
+            "chain": "Polygon",
+            "requested_time_range": "24h",
+            "resolved_time_range": "1h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    "corridor_live_parity": {
+      "notes": [
+        "Corridor parity uses materialized summaries versus fresh recomputation from current batch poll inputs.",
+        "No request-path BigQuery execution occurs during this audit check."
+      ],
+      "sampled_entities": [
+        {
+          "fields_compared": [
+            "volume_24h",
+            "volume_7d",
+            "tx_count",
+            "unique_senders",
+            "unique_receivers",
+            "velocity_unique_capital",
+            "concentration_score",
+            "bridge_name",
+            "bridge_share",
+            "bridge_volume",
+            "bridge_transactions",
+            "whale_threshold_usd",
+            "whale_activity_score",
+            "net_flow_7d",
+            "top_whale_flows",
+            "source",
+            "data_layer",
+            "serving_path"
+          ],
+          "intentional_deltas": [],
+          "mismatches": [],
+          "notes": [
+            "Materialized corridor summary compared against fresh recomputation from cache poll inputs."
+          ],
+          "scope": {
+            "corridor_id": "US-MX",
+            "rail": "Ethereum",
+            "time_range": "24h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        },
+        {
+          "fields_compared": [
+            "volume_24h",
+            "volume_7d",
+            "tx_count",
+            "unique_senders",
+            "unique_receivers",
+            "velocity_unique_capital",
+            "concentration_score",
+            "bridge_name",
+            "bridge_share",
+            "bridge_volume",
+            "bridge_transactions",
+            "whale_threshold_usd",
+            "whale_activity_score",
+            "net_flow_7d",
+            "top_whale_flows",
+            "source",
+            "data_layer",
+            "serving_path"
+          ],
+          "intentional_deltas": [],
+          "mismatches": [],
+          "notes": [
+            "Materialized corridor summary compared against fresh recomputation from cache poll inputs."
+          ],
+          "scope": {
+            "corridor_id": "US-MX",
+            "rail": "Polygon",
+            "time_range": "24h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        },
+        {
+          "fields_compared": [
+            "volume_24h",
+            "volume_7d",
+            "tx_count",
+            "unique_senders",
+            "unique_receivers",
+            "velocity_unique_capital",
+            "concentration_score",
+            "bridge_name",
+            "bridge_share",
+            "bridge_volume",
+            "bridge_transactions",
+            "whale_threshold_usd",
+            "whale_activity_score",
+            "net_flow_7d",
+            "top_whale_flows",
+            "source",
+            "data_layer",
+            "serving_path"
+          ],
+          "intentional_deltas": [],
+          "mismatches": [],
+          "notes": [
+            "Materialized corridor summary compared against fresh recomputation from cache poll inputs."
+          ],
+          "scope": {
+            "corridor_id": "US-BR",
+            "rail": "Ethereum",
+            "time_range": "24h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        },
+        {
+          "fields_compared": [
+            "volume_24h",
+            "volume_7d",
+            "tx_count",
+            "unique_senders",
+            "unique_receivers",
+            "velocity_unique_capital",
+            "concentration_score",
+            "bridge_name",
+            "bridge_share",
+            "bridge_volume",
+            "bridge_transactions",
+            "whale_threshold_usd",
+            "whale_activity_score",
+            "net_flow_7d",
+            "top_whale_flows",
+            "source",
+            "data_layer",
+            "serving_path"
+          ],
+          "intentional_deltas": [],
+          "mismatches": [],
+          "notes": [
+            "Materialized corridor summary compared against fresh recomputation from cache poll inputs."
+          ],
+          "scope": {
+            "corridor_id": "US-BR",
+            "rail": "Polygon",
+            "time_range": "24h",
+            "token": "USDC"
+          },
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    }
+  },
+  "generated_at": "2026-03-20T18:14:02.958215+00:00",
+  "status": "pass"
+}
