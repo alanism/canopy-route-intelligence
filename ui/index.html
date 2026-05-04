@@ -2279,6 +2279,66 @@
                             </div>
                         </div>
                     </article>
+
+                    ${(() => {
+                        const sh = state.solanaHealth;
+                        const freshness = sh?.freshness_state || "unavailable";
+                        const isUnavailable = freshness === "unavailable";
+                        const isStale = freshness === "stale";
+                        const freshnessLabel = isUnavailable ? "Unavailable" : isStale ? "Stale — degraded" : "Fresh";
+                        const freshnessStyle = isUnavailable
+                            ? "color:#888"
+                            : isStale
+                            ? "color:#c07000;font-weight:600"
+                            : "color:#1a7a3a;font-weight:600";
+                        return `<article class="panel">
+                            <div class="section-heading">
+                                <div>
+                                    <div class="eyebrow">Solana Data Layer</div>
+                                    <h2>Solana ingestion health</h2>
+                                </div>
+                            </div>
+                            <div class="health-grid">
+                                <div class="mini-card">
+                                    <div class="mini-label">Freshness state</div>
+                                    <div class="mini-detail" style="${freshnessStyle}">${escapeHtml(freshnessLabel)}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Last slot</div>
+                                    <div class="mini-detail">${escapeHtml(sh?.last_slot != null ? String(sh.last_slot) : "No data")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Chain lag</div>
+                                    <div class="mini-detail">${escapeHtml(sh?.lag_seconds != null ? `${Math.round(sh.lag_seconds)}s` : "-")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Last ingested at</div>
+                                    <div class="mini-detail">${escapeHtml(formatTimestampOrInitializing(sh?.last_ingested_at))}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Last run status</div>
+                                    <div class="mini-detail">${escapeHtml(sh?.last_run_status || "not started")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Events written</div>
+                                    <div class="mini-detail">${escapeHtml(sh?.events_written != null ? String(sh.events_written) : "-")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Validation gate</div>
+                                    <div class="mini-detail">${escapeHtml(sh?.last_validation_status || "-")}</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-label">Last error</div>
+                                    <div class="mini-detail">${escapeHtml(sh?.last_error || "None")}</div>
+                                </div>
+                                ${isUnavailable || isStale ? `
+                                <div class="mini-card" style="grid-column: 1 / -1; background:#fffbe6; border-color:#ffe08a;">
+                                    <div class="mini-label" style="color:#7a5200;">Scope disclaimer</div>
+                                    <div class="mini-detail" style="color:#5a3c00;">${escapeHtml(sh?.scope_disclaimer || "Solana data reflects observed SPL token movements within configured watched sources and measured windows.")}</div>
+                                </div>` : ""}
+                            </div>
+                        </article>`;
+                    })()}
                 </section>
 
                 <section class="panel">
@@ -2724,16 +2784,18 @@
         }
 
         async function loadWorkspace() {
-            const [overview, runs, clientConfig, refreshControl] = await Promise.all([
+            const [overview, runs, clientConfig, refreshControl, solanaHealth] = await Promise.all([
                 fetchJson(`${API_BASE}/v1/overview`),
                 fetchJson(`${API_BASE}/v1/payroll-runs`),
                 fetchJson(`${API_BASE}/v1/client-config`),
                 fetchJson(`${API_BASE}/v1/measured-refresh-status`),
+                fetchJson(`${API_BASE}/v1/solana/health`).catch(() => null),
             ]);
             state.overview = overview;
             state.runs = runs.items || [];
             state.clientConfig = clientConfig;
             state.refreshControl = refreshControl;
+            state.solanaHealth = solanaHealth;
             state.selectedRunId = state.selectedRunId || state.runs[0]?.id || null;
             state.mapAvailable = Boolean(clientConfig.mapbox_token_present && window.mapboxgl && !state.mapLoadFailed);
             renderSidebar();

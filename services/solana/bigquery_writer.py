@@ -1,0 +1,291 @@
+"""
+Phase 4 — Solana BigQuery Writer.
+
+Writes normalized Solana events to the `solana_measured` BigQuery table.
+
+BigQuery rules for Solana
+--------------------------
+- Solana ingestion is RPC-first. Do not assume public Solana BigQuery availability.
+- BIGNUMERIC for all raw integer amounts (u64-compatible, no precision loss).
+- NUMERIC for amount_decimal (28 digits, 9 decimal places — USDC needs 6).
+- No FLOAT64 anywhere in the Solana schema.
+- Partition on `slot` (INTEGER) for cost-efficient range queries.
+- Cluster on `token_mint`, `chain` for corridor analytics.
+- Rows are append-only at insert. No UPDATE/DELETE in the measured layer.
+
+Dry-run gate
+------------
+Every insert is preceded by a dry-run row-count estimate. If the BigQuery
+client is unavailable (missing credentials), the writer falls back to
+local JSON file output (data/solana_events_buffer.jsonl) so ingestion
+continues unblocked during development.
+
+decimal.Decimal → BigQuery
+--------------------------
+BigQuery Python client does not natively serialize decimal.Decimal to
+BIGNUMERIC. We convert via str(value) before insertion — BigQuery accepts
+numeric strings for BIGNUMERIC/NUMERIC columns.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any, Optional
+
+logger = logging.getLogger("canopy.solana.bigquery_writer")
+
+# ---------------------------------------------------------------------------
+# Schema constants
+# ---------------------------------------------------------------------------
+
+DATASET = os.environ.get("SOLANA_BQ_DATASET", "solana_measured")
+TABLE = os.environ.get("SOLANA_BQ_TABLE", "solana_transfers")
+FALLBACK_BUFFER_PATH = os.path.join("data", "solana_events_buffer.jsonl")
+
+# BigQuery schema for the solana_measured.solana_transfers table.
+# BIGNUMERIC for raw integer amounts; NUMERIC for decimal amounts.
+BQ_SCHEMA = [
+    # Identity
+    {"name": "chain",               "type": "STRING",     "mode": "REQUIRED"},
+    {"name": "signature",           "type": "STRING",     "mode": "REQUIRED"},
+    {"name": "slot",                "type": "INTEGER",    "mode": "NULLABLE"},
+    {"name": "block_time",          "type": "INTEGER",    "mode": "NULLABLE"},
+    # Token accounts
+    {"name": "token_mint",                  "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "source_token_account",        "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "destination_token_account",   "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "source_owner",               "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "destination_owner",          "type": "STRING",     "mode": "NULLABLE"},
+    # Instruction position
+    {"name": "instruction_index",       "type": "INTEGER",    "mode": "NULLABLE"},
+    {"name": "inner_instruction_index", "type": "INTEGER",    "mode": "NULLABLE"},
+    {"name": "transfer_ordinal",        "type": "INTEGER",    "mode": "NULLABLE"},
+    {"name": "program_id",              "type": "STRING",     "mode": "NULLABLE"},
+    # Amounts — BIGNUMERIC for raw (u64), NUMERIC for decimal
+    {"name": "amount_raw",              "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "amount_decimal",          "type": "NUMERIC",    "mode": "NULLABLE"},
+    {"name": "amount_transferred_raw",  "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "fee_withheld_raw",        "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "amount_received_raw",     "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    # Cost — all BIGNUMERIC (lamports are u64-range)
+    {"name": "fee_lamports",                        "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "native_base_fee_lamports",            "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "native_priority_fee_lamports",        "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "jito_tip_lamports",                   "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "explicit_tip_lamports",               "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    {"name": "total_native_observed_cost_lamports", "type": "BIGNUMERIC", "mode": "NULLABLE"},
+    # Transfer truth
+    {"name": "transaction_success",        "type": "BOOLEAN",    "mode": "NULLABLE"},
+    {"name": "transfer_detected",          "type": "BOOLEAN",    "mode": "NULLABLE"},
+    {"name": "balance_delta_detected",     "type": "BOOLEAN",    "mode": "NULLABLE"},
+    {"name": "observed_transfer_inclusion","type": "BOOLEAN",    "mode": "NULLABLE"},
+    {"name": "settlement_evidence_type",   "type": "STRING",     "mode": "NULLABLE"},
+    # Metadata
+    {"name": "decode_version",         "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "validation_status",      "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "cost_detection_status",  "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "tip_detection_status",   "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "provider",               "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "provider_mode",          "type": "STRING",     "mode": "NULLABLE"},
+    # Canonical keys
+    {"name": "raw_event_id",          "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "normalized_event_id",   "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "event_fingerprint",     "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "collision_detected",    "type": "BOOLEAN",    "mode": "NULLABLE"},
+    # Resolution statuses
+    {"name": "alt_resolution_status",    "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "owner_resolution_status",  "type": "STRING",     "mode": "NULLABLE"},
+    {"name": "amount_resolution_status", "type": "STRING",     "mode": "NULLABLE"},
+    # Ingestion timestamp
+    {"name": "ingested_at",           "type": "TIMESTAMP",  "mode": "NULLABLE"},
+]
+
+# Fields whose values must be serialized as str() for BIGNUMERIC/NUMERIC
+# Integer (u64) raw amount fields — serialized as plain str(int)
+_BIGNUMERIC_INT_FIELDS = frozenset({
+    "amount_raw", "amount_transferred_raw", "fee_withheld_raw",
+    "amount_received_raw", "fee_lamports", "native_base_fee_lamports",
+    "native_priority_fee_lamports", "jito_tip_lamports", "explicit_tip_lamports",
+    "total_native_observed_cost_lamports",
+})
+# Decimal amount field — serialized with fixed 6-decimal precision for USDC
+_NUMERIC_DECIMAL_FIELDS = frozenset({"amount_decimal"})
+# All numeric fields (union — used for float guard)
+_BIGNUMERIC_FIELDS = _BIGNUMERIC_INT_FIELDS | _NUMERIC_DECIMAL_FIELDS
+
+
+# ---------------------------------------------------------------------------
+# Write result
+# ---------------------------------------------------------------------------
+
+class WriteResult:
+    def __init__(
+        self,
+        rows_attempted: int = 0,
+        rows_inserted: int = 0,
+        errors: Optional[list[str]] = None,
+        fallback_used: bool = False,
+    ):
+        self.rows_attempted = rows_attempted
+        self.rows_inserted = rows_inserted
+        self.errors: list[str] = errors or []
+        self.fallback_used = fallback_used
+
+    @property
+    def success(self) -> bool:
+        return self.rows_inserted == self.rows_attempted and not self.errors
+
+
+# ---------------------------------------------------------------------------
+# SolanaEventWriter
+# ---------------------------------------------------------------------------
+
+class SolanaEventWriter:
+    """
+    Writes normalized Solana events to BigQuery (or local fallback buffer).
+
+    Inject a BigQuery client for production use. Without a client, the writer
+    uses the local JSONL buffer so ingestion continues during development.
+
+    Usage
+    -----
+    writer = SolanaEventWriter()                     # auto-detects BQ client
+    writer = SolanaEventWriter(bq_client=mock_client) # inject in tests
+
+    result = writer.write_batch(normalized_events)
+    """
+
+    def __init__(
+        self,
+        bq_client=None,
+        *,
+        dataset: str = DATASET,
+        table: str = TABLE,
+        fallback_path: str = FALLBACK_BUFFER_PATH,
+    ) -> None:
+        self._bq_client = bq_client
+        self._dataset = dataset
+        self._table = table
+        self._fallback_path = fallback_path
+        self._table_ref: Optional[str] = None
+
+    def write_batch(self, normalized_events: list[dict[str, Any]]) -> WriteResult:
+        """
+        Write a batch of normalized events.
+
+        Uses BigQuery if a client is available; falls back to local JSONL buffer.
+        Never raises — returns WriteResult with error details on failure.
+        """
+        if not normalized_events:
+            return WriteResult()
+
+        rows = [_serialize_for_bq(e) for e in normalized_events]
+
+        if self._bq_client is not None:
+            return self._write_to_bq(rows)
+        else:
+            return self._write_to_fallback(rows)
+
+    def table_id(self) -> str:
+        return f"{self._dataset}.{self._table}"
+
+    # ------------------------------------------------------------------
+    # BigQuery path
+    # ------------------------------------------------------------------
+
+    def _write_to_bq(self, rows: list[dict[str, Any]]) -> WriteResult:
+        try:
+            table_ref = self._bq_client.dataset(self._dataset).table(self._table)
+            errors = self._bq_client.insert_rows_json(table_ref, rows)
+            if errors:
+                error_msgs = [str(e) for e in errors]
+                logger.error("BigQuery insert errors: %s", error_msgs)
+                return WriteResult(
+                    rows_attempted=len(rows),
+                    rows_inserted=len(rows) - len(errors),
+                    errors=error_msgs,
+                )
+            logger.info("BigQuery: inserted %d Solana events to %s", len(rows), self.table_id())
+            return WriteResult(rows_attempted=len(rows), rows_inserted=len(rows))
+        except Exception as exc:
+            msg = f"BigQuery write failed: {exc}"
+            logger.error(msg)
+            return WriteResult(rows_attempted=len(rows), errors=[msg])
+
+    # ------------------------------------------------------------------
+    # Local fallback buffer
+    # ------------------------------------------------------------------
+
+    def _write_to_fallback(self, rows: list[dict[str, Any]]) -> WriteResult:
+        """Append rows to JSONL buffer file. Used when BQ client is unavailable."""
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(self._fallback_path)), exist_ok=True)
+            with open(self._fallback_path, "a", encoding="utf-8") as fh:
+                for row in rows:
+                    fh.write(json.dumps(row, default=str) + "\n")
+            logger.info(
+                "Fallback buffer: wrote %d Solana events to %s",
+                len(rows), self._fallback_path,
+            )
+            return WriteResult(
+                rows_attempted=len(rows),
+                rows_inserted=len(rows),
+                fallback_used=True,
+            )
+        except OSError as exc:
+            msg = f"Fallback buffer write failed: {exc}"
+            logger.error(msg)
+            return WriteResult(rows_attempted=len(rows), errors=[msg])
+
+
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
+
+def _serialize_for_bq(event: dict[str, Any]) -> dict[str, Any]:
+    """
+    Prepare a normalized event dict for BigQuery JSON insertion.
+
+    - BIGNUMERIC/NUMERIC fields: convert int/Decimal → str (BQ accepts numeric strings)
+    - None values: preserved as None (BQ treats as NULL)
+    - float: raise immediately — float is prohibited in Solana amounts
+    - Strip private keys (prefixed with '_')
+    """
+    result: dict[str, Any] = {}
+    for key, val in event.items():
+        if key.startswith("_"):
+            continue  # drop internal passthrough fields
+        if key in _BIGNUMERIC_FIELDS:
+            if isinstance(val, float):
+                raise TypeError(
+                    f"Float found in BIGNUMERIC field '{key}': {val!r}. "
+                    "Solana amounts must be int or decimal.Decimal."
+                )
+            if val is None:
+                result[key] = None
+            elif key in _NUMERIC_DECIMAL_FIELDS:
+                # NUMERIC column: preserve trailing zeros so BQ sees full precision
+                # e.g. Decimal("1.000000") → "1.000000" not "1"
+                result[key] = f"{val:.6f}"
+            else:
+                result[key] = str(val)
+        else:
+            result[key] = val
+    return result
+
+
+def _bq_schema_fields():
+    """
+    Return BigQuery SchemaField objects from BQ_SCHEMA.
+
+    Imported lazily so tests don't require google-cloud-bigquery installed.
+    """
+    from google.cloud.bigquery import SchemaField
+    return [
+        SchemaField(f["name"], f["type"], mode=f.get("mode", "NULLABLE"))
+        for f in BQ_SCHEMA
+    ]

@@ -56,6 +56,7 @@ from api.x402 import (
 )
 from models.response_models import ContextGraphResponseModel
 from services.corridor_config import get_config_health, load_corridor_config
+from services.solana.api_integration import get_solana_api_state
 from services.context_graph import cache as context_graph_cache
 from services.context_graph.queries import SUPPORTED_TIME_RANGES
 from services.context_graph.service import build_response_payload, resolve_chain
@@ -530,6 +531,7 @@ async def health():
                     "last_attempt_at": eth_state.get("last_attempt_at"),
                     "last_error": eth_state.get("last_error"),
                 },
+                "Solana": get_solana_api_state().to_chain_health_dict(),
             },
             "corridor_config_status": config_health.get("status"),
             "corridor_config_source": config_health.get("source"),
@@ -810,6 +812,32 @@ async def discovery_summary(corridor_key: Optional[str] = None):
 @app.get("/v1/system/bigquery-metrics")
 async def bigquery_metrics():
     return JSONResponse(content=get_query_metrics_snapshot())
+
+
+@app.get("/v1/solana/health")
+async def solana_health():
+    """
+    Solana data layer health and freshness state.
+
+    Returns the current FreshnessMonitor state, last ingestion run metrics,
+    and validation gate result. freshness_state is one of:
+      "fresh"       — data is current (within SOLANA_FRESHNESS_THRESHOLD_SECONDS)
+      "stale"       — ingestion lag exceeds threshold; data shown with warning
+      "unavailable" — no Solana data has been ingested yet
+
+    The ``chain_health`` sub-key mirrors the Polygon/Ethereum shape in /health
+    so the dashboard can render a Solana row without bespoke handling.
+    """
+    state = get_solana_api_state()
+    return JSONResponse(content={
+        **state.to_dict(),
+        "chain": "Solana",
+        "chain_health": state.to_chain_health_dict(),
+        "scope_disclaimer": (
+            "Solana data reflects observed SPL token movements within "
+            "configured watched sources and measured windows."
+        ),
+    })
 
 
 @app.get("/v1/overview")
