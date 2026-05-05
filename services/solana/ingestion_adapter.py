@@ -59,6 +59,11 @@ DEFAULT_MAX_SIGNATURES_PER_RUN = 200
 DEFAULT_MAX_TRANSACTIONS_PER_RUN = 200
 DEFAULT_MAX_INNER_INSTRUCTIONS_PER_TX = 64
 DEFAULT_COMMITMENT = "finalized"
+AMBIGUOUS_EMPTY_THRESHOLD = 3
+
+
+class ProviderLagError(ValueError):
+    """Raised when the RPC provider is behind the required finalized cursor."""
 
 
 # ---------------------------------------------------------------------------
@@ -112,11 +117,16 @@ class IngestionConfig:
                 "Configure at least one watched address."
             )
 
-        mint_raw = os.environ.get("SOLANA_TOKEN_MINT_ALLOWLIST", "")
-        mints: set[str] = (
-            {m.strip() for m in mint_raw.split(",") if m.strip()}
-            if mint_raw else {USDC_MINT}
-        )
+        token_mint = (os.environ.get("SOLANA_TOKEN_MINT") or "").strip()
+        mint_allowlist_raw = os.environ.get("SOLANA_TOKEN_MINT_ALLOWLIST", "")
+        # Canonical v3 env var is SOLANA_TOKEN_MINT. Keep allowlist as
+        # backward-compatible fallback until all environments are migrated.
+        if token_mint:
+            mints = {token_mint}
+        elif mint_allowlist_raw:
+            mints = {m.strip() for m in mint_allowlist_raw.split(",") if m.strip()}
+        else:
+            mints = {USDC_MINT}
 
         return cls(
             primary_url=primary,
@@ -155,6 +165,9 @@ class IngestionRunResult:
     alt_metrics: dict[str, int] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     run_status: str = "ok"                  # "ok" | "degraded" | "failed"
+    ingestion_state: str = "unavailable"    # running|succeeded|failed|circuit_open|provider_lagging|unavailable
+    observation_state: str = "unavailable"  # observed|no_recent_activity|ambiguous_empty|unavailable
+    commitment_level: str = DEFAULT_COMMITMENT
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +213,7 @@ class SolanaIngestionAdapter:
         # Circuit breaker and rate limiter (optional — None disables them)
         self._circuit_breaker = circuit_breaker
         self._rate_limiter = rate_limiter
+        self._empty_response_counts: dict[str, int] = {}
 
     def run(self, *, start_signature: Optional[str] = None) -> IngestionRunResult:
         """
@@ -212,7 +226,11 @@ class SolanaIngestionAdapter:
             This is the last-processed signature (exclusive upper bound for
             getSignaturesForAddress — we fetch signatures *before* this one).
         """
-        result = IngestionRunResult()
+        result = IngestionRunResult(
+            ingestion_state="running",
+            observation_state="unavailable",
+            commitment_level=self._config.commitment,
+        )
 
         # Fresh ProcessingCache for this run — enforces ALT RPC efficiency guarantee
         processing_cache = ProcessingCache()
@@ -249,6 +267,7 @@ class SolanaIngestionAdapter:
                         logger.error(msg)
                         result.errors.append(msg)
                         result.run_status = "failed"
+                        result.ingestion_state = "failed"
                         return result
                     break  # use first mint for cursor (all share same sig space)
 
@@ -257,6 +276,7 @@ class SolanaIngestionAdapter:
                     self._circuit_breaker.before_call()
                 if self._rate_limiter:
                     self._rate_limiter.acquire()
+                self._reject_provider_lag(watched_address)
                 signatures = self._fetch_signatures(watched_address, before=cursor)
                 if self._circuit_breaker:
                     self._circuit_breaker.record_success()
@@ -265,16 +285,42 @@ class SolanaIngestionAdapter:
                 logger.error(msg)
                 result.errors.append(msg)
                 result.run_status = "degraded"
+                result.ingestion_state = "circuit_open"
                 break  # stop the entire run — circuit is open
+            except ProviderLagError as exc:
+                msg = f"getSignaturesForAddress failed for {watched_address}: {exc}"
+                logger.error(msg)
+                result.errors.append(msg)
+                result.run_status = "degraded"
+                result.ingestion_state = "provider_lagging"
+                if self._circuit_breaker:
+                    self._circuit_breaker.record_failure()
+                continue
             except Exception as exc:
                 msg = f"getSignaturesForAddress failed for {watched_address}: {exc}"
                 logger.error(msg)
                 result.errors.append(msg)
                 result.run_status = "degraded"
+                result.ingestion_state = "failed"
                 if self._circuit_breaker:
                     self._circuit_breaker.record_failure()
                 continue
 
+            if not signatures:
+                empty_count = self._empty_response_counts.get(watched_address, 0) + 1
+                self._empty_response_counts[watched_address] = empty_count
+                if empty_count >= AMBIGUOUS_EMPTY_THRESHOLD:
+                    result.observation_state = "ambiguous_empty"
+                    result.run_status = "degraded"
+                    result.ingestion_state = "provider_lagging"
+                    result.errors.append(
+                        f"ambiguous empty getSignaturesForAddress response for {watched_address}: "
+                        f"{empty_count} consecutive empty finalized windows"
+                    )
+                elif result.observation_state == "unavailable":
+                    result.observation_state = "no_recent_activity"
+            else:
+                self._empty_response_counts[watched_address] = 0
             result.signatures_fetched += len(signatures)
 
             for sig_info in signatures:
@@ -302,6 +348,7 @@ class SolanaIngestionAdapter:
                     logger.error(msg)
                     result.errors.append(msg)
                     result.run_status = "degraded"
+                    result.ingestion_state = "circuit_open"
                     break
                 except Exception as exc:
                     msg = f"getTransaction failed for {signature[:16]}: {exc}"
@@ -309,6 +356,7 @@ class SolanaIngestionAdapter:
                     result.errors.append(msg)
                     result.transactions_degraded += 1
                     result.run_status = "degraded"
+                    result.ingestion_state = "failed"
                     if self._circuit_breaker:
                         self._circuit_breaker.record_failure()
                     continue
@@ -317,6 +365,18 @@ class SolanaIngestionAdapter:
                     result.errors.append(f"getTransaction returned None for {signature[:16]}")
                     result.transactions_degraded += 1
                     result.run_status = "degraded"
+                    result.ingestion_state = "failed"
+                    continue
+
+                if not self._transaction_commitment_matches(raw_tx):
+                    tx_commitment = _response_commitment(raw_tx)
+                    result.errors.append(
+                        f"getTransaction returned commitment {tx_commitment!r} "
+                        f"for {signature[:16]}; expected {self._config.commitment!r}"
+                    )
+                    result.transactions_degraded += 1
+                    result.run_status = "degraded"
+                    result.ingestion_state = "failed"
                     continue
 
                 result.transactions_fetched += 1
@@ -347,8 +407,10 @@ class SolanaIngestionAdapter:
                     continue
 
                 result.raw_events.append(event)
+                event["watched_address"] = watched_address
                 result.transactions_processed += 1
                 transactions_processed_total += 1
+                result.observation_state = "observed"
 
         # Merge ALT cache metrics
         result.alt_metrics = alt_manager.combined_metrics()
@@ -359,6 +421,13 @@ class SolanaIngestionAdapter:
             result.transactions_degraded,
             result.alt_metrics,
         )
+        if result.ingestion_state == "running":
+            if result.run_status == "ok":
+                result.ingestion_state = "succeeded"
+            elif result.run_status == "degraded":
+                result.ingestion_state = "provider_lagging"
+            else:
+                result.ingestion_state = "failed"
         return result
 
     # ------------------------------------------------------------------
@@ -396,6 +465,20 @@ class SolanaIngestionAdapter:
             payload,
             context=f"getSignaturesForAddress({address[:8]}…)",
         )
+        if not isinstance(raw, dict):
+            raise ValueError("RPC returned malformed response for getSignaturesForAddress")
+        if raw.get("error") is not None:
+            err = raw["error"]
+            if isinstance(err, dict):
+                raise ValueError(
+                    "RPC returned error for getSignaturesForAddress: "
+                    f"{err.get('code', '?')}: {err.get('message', '?')}"
+                )
+            raise ValueError(f"RPC returned error for getSignaturesForAddress: {err}")
+        if raw.get("result", "__missing__") is None:
+            raise ValueError("RPC returned null result for getSignaturesForAddress")
+        if "result" not in raw or not isinstance(raw["result"], list):
+            raise ValueError("RPC returned malformed result for getSignaturesForAddress")
         sigs: list[dict] = raw.get("result", []) or []
         # RPC returns newest-first; reverse to process chronologically
         return list(reversed(sigs))
@@ -412,6 +495,30 @@ class SolanaIngestionAdapter:
             commitment=self._config.commitment,
             encoding="json",
         )
+
+    def _reject_provider_lag(self, watched_address: str) -> None:
+        """
+        Reject providers whose finalized slot is behind the configured cursor.
+
+        The adapter can only compare provider state to the cursor it has been
+        explicitly asked to process from. A provider below that slot cannot
+        safely prove an empty finalized window.
+        """
+        start_slot = self._config.start_slot
+        if not start_slot or not hasattr(self._rpc, "get_slot"):
+            return
+        provider_slot = self._rpc.get_slot(commitment=self._config.commitment)
+        if provider_slot is None:
+            raise ValueError("RPC returned null result for getSlot")
+        if int(provider_slot) < int(start_slot):
+            raise ProviderLagError(
+                f"provider lag detected for {watched_address}: "
+                f"provider finalized slot {provider_slot} < start slot {start_slot}"
+            )
+
+    def _transaction_commitment_matches(self, raw_tx: dict[str, Any]) -> bool:
+        commitment = _response_commitment(raw_tx)
+        return commitment is None or commitment == self._config.commitment
 
     # ------------------------------------------------------------------
     # Internal: full transaction processing pipeline
@@ -460,8 +567,8 @@ class SolanaIngestionAdapter:
             self._config.token_mint_allowlist,
         )
 
-        # If no watched mint present, skip (do not count as error)
-        if truth.get("_no_transfer_reason") == "watched_mint_absent":
+        # If no watched transfer occurred, skip (do not count as error).
+        if truth.get("_no_transfer_reason"):
             return {"_skip_no_watched_mint": True}
 
         # Step 4: Jito tip detection
@@ -553,3 +660,14 @@ def _inner_instruction_count(raw_tx: dict[str, Any]) -> int:
     meta = raw_tx.get("meta") or {}
     inner_groups: list[dict] = meta.get("innerInstructions") or []
     return sum(len(g.get("instructions", [])) for g in inner_groups)
+
+
+def _response_commitment(raw_tx: dict[str, Any]) -> Optional[str]:
+    """Return provider-reported commitment if present in a response wrapper."""
+    commitment = raw_tx.get("commitment") or raw_tx.get("_commitment")
+    if commitment is not None:
+        return str(commitment)
+    context = raw_tx.get("context")
+    if isinstance(context, dict) and context.get("commitment") is not None:
+        return str(context["commitment"])
+    return None

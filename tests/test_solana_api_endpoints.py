@@ -133,6 +133,9 @@ class TestSolanaHealthEndpointContract:
         assert payload["chain"] == "Solana"
         assert "chain_health" in payload
         assert "scope_disclaimer" in payload
+        assert "ingestion_state" in payload
+        assert "observation_state" in payload
+        assert "commitment_level" in payload
 
     def test_scope_disclaimer_always_present(self):
         for make_cache in (_make_fresh_cache, _make_stale_cache, _make_unavailable_cache):

@@ -73,6 +73,9 @@ class SolanaAPIState:
 
     # Ingestion run metrics (from IngestionRunResult)
     last_run_status: str = "not_started"           # "ok" | "degraded" | "failed" | "not_started"
+    ingestion_state: str = "unavailable"           # running|succeeded|failed|circuit_open|provider_lagging|unavailable
+    observation_state: str = "unavailable"         # observed|no_recent_activity|ambiguous_empty|unavailable
+    commitment_level: str = "finalized"            # finalized|confirmed|processed
     last_run_at: Optional[str] = None              # ISO8601
     signatures_fetched: int = 0
     transactions_processed: int = 0
@@ -97,6 +100,9 @@ class SolanaAPIState:
             "last_block_time": self.last_block_time,
             "last_ingested_at": self.last_ingested_at,
             "last_run_status": self.last_run_status,
+            "ingestion_state": self.ingestion_state,
+            "observation_state": self.observation_state,
+            "commitment_level": self.commitment_level,
             "last_run_at": self.last_run_at,
             "signatures_fetched": self.signatures_fetched,
             "transactions_processed": self.transactions_processed,
@@ -132,6 +138,9 @@ class SolanaAPIState:
             "last_block_time": self.last_block_time,
             "last_ingested_at": self.last_ingested_at,
             "last_run_status": self.last_run_status,
+            "ingestion_state": self.ingestion_state,
+            "observation_state": self.observation_state,
+            "commitment_level": self.commitment_level,
             "last_run_at": self.last_run_at,
             "transactions_processed": self.transactions_processed,
             "events_written": self.events_written,
@@ -186,6 +195,9 @@ class SolanaCache:
         slot: int,
         block_time: int,
         run_status: str,
+        commitment_level: str = "finalized",
+        ingestion_state: Optional[str] = None,
+        observation_state: Optional[str] = None,
         signatures_fetched: int = 0,
         transactions_processed: int = 0,
         transactions_degraded: int = 0,
@@ -226,6 +238,13 @@ class SolanaCache:
         now_iso = _utcnow_iso()
         report = self._monitor.health_report()
 
+        effective_ingestion_state = ingestion_state or _default_ingestion_state(run_status)
+        effective_observation_state = observation_state or _default_observation_state(
+            run_status=run_status,
+            signatures_fetched=signatures_fetched,
+            events_written=events_written,
+        )
+
         # Reference-replace the state dict (GIL-safe for async read path)
         self._state = SolanaAPIState(
             freshness_state=report.state,
@@ -237,6 +256,9 @@ class SolanaCache:
             last_block_time=report.last_block_time,
             last_ingested_at=now_iso,
             last_run_status=run_status,
+            ingestion_state=effective_ingestion_state,
+            observation_state=effective_observation_state,
+            commitment_level=commitment_level,
             last_run_at=now_iso,
             signatures_fetched=signatures_fetched,
             transactions_processed=transactions_processed,
@@ -282,6 +304,9 @@ class SolanaCache:
             last_block_time=s.last_block_time,
             last_ingested_at=s.last_ingested_at,
             last_run_status=s.last_run_status,
+            ingestion_state=s.ingestion_state,
+            observation_state=s.observation_state,
+            commitment_level=s.commitment_level,
             last_run_at=s.last_run_at,
             signatures_fetched=s.signatures_fetched,
             transactions_processed=s.transactions_processed,
@@ -339,3 +364,28 @@ def get_solana_api_state() -> SolanaAPIState:
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _default_ingestion_state(run_status: str) -> str:
+    if run_status == "ok":
+        return "succeeded"
+    if run_status == "degraded":
+        return "provider_lagging"
+    if run_status == "failed":
+        return "failed"
+    return "unavailable"
+
+
+def _default_observation_state(
+    *,
+    run_status: str,
+    signatures_fetched: int,
+    events_written: int,
+) -> str:
+    if run_status == "failed":
+        return "unavailable"
+    if events_written > 0:
+        return "observed"
+    if signatures_fetched > 0 and events_written == 0:
+        return "no_recent_activity"
+    return "unavailable"

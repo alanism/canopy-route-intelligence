@@ -29,6 +29,7 @@ from services.solana.constants import (
     SYSTEM_PROGRAM,
     USDC_MINT,
 )
+from services.solana.checkpoint import CheckpointStore
 from services.solana.ingestion_adapter import (
     IngestionConfig,
     IngestionRunResult,
@@ -70,10 +71,18 @@ class MockRPCClient:
         transactions_by_sig: Optional[dict[str, dict]] = None,
         *,
         fail_transactions: Optional[set[str]] = None,
+        null_signatures_for: Optional[set[str]] = None,
+        signature_errors_for: Optional[set[str]] = None,
+        malformed_signatures_for: Optional[set[str]] = None,
+        provider_slot: Optional[int] = None,
     ) -> None:
         self.signatures_by_address = signatures_by_address or {}
         self.transactions_by_sig = transactions_by_sig or {}
         self.fail_transactions: set[str] = fail_transactions or set()
+        self.null_signatures_for: set[str] = null_signatures_for or set()
+        self.signature_errors_for: set[str] = signature_errors_for or set()
+        self.malformed_signatures_for: set[str] = malformed_signatures_for or set()
+        self.provider_slot = provider_slot
         self.primary_url = "http://mock-primary"
         self.fallback_url = None
         self._provider_mode = "primary"
@@ -93,11 +102,20 @@ class MockRPCClient:
             return None
         return self.transactions_by_sig.get(signature)
 
+    def get_slot(self, *, commitment="finalized", use_fallback=False):
+        return self.provider_slot
+
     def _post_with_retry(self, url, payload, *, context=""):
         """Handle getSignaturesForAddress calls."""
         method = payload.get("method", "")
         if method == "getSignaturesForAddress":
             address = payload["params"][0]
+            if address in self.signature_errors_for:
+                return {"error": {"code": -32005, "message": "provider lagging"}}
+            if address in self.null_signatures_for:
+                return {"result": None}
+            if address in self.malformed_signatures_for:
+                return {"result": {"unexpected": "shape"}}
             opts = payload["params"][1] if len(payload["params"]) > 1 else {}
             limit = opts.get("limit", 1000)
             sigs = self.signatures_by_address.get(address, [])
@@ -186,6 +204,7 @@ def _make_config(
     max_signatures: int = 200,
     max_transactions: int = 200,
     start_signature: Optional[str] = None,
+    start_slot: Optional[int] = None,
 ) -> IngestionConfig:
     return IngestionConfig(
         primary_url="http://mock-primary",
@@ -194,6 +213,7 @@ def _make_config(
         max_signatures_per_run=max_signatures,
         max_transactions_per_run=max_transactions,
         start_signature=start_signature,
+        start_slot=start_slot,
     )
 
 
@@ -202,6 +222,7 @@ def _make_adapter(
     config: Optional[IngestionConfig] = None,
     *,
     tmp_path=None,
+    checkpoint_store: Optional[CheckpointStore] = None,
 ) -> SolanaIngestionAdapter:
     cache_path = str(tmp_path / "alt_cache.json") if tmp_path else ":memory_test:"
     pers = PersistentALTCache(cache_path=cache_path)
@@ -209,6 +230,7 @@ def _make_adapter(
         config or _make_config(),
         rpc_client=rpc,
         persistent_cache=pers,
+        checkpoint_store=checkpoint_store,
     )
 
 
@@ -250,6 +272,27 @@ class TestIngestionConfigFromEnv:
             cfg = IngestionConfig.from_env()
             assert USDC_MINT in cfg.token_mint_allowlist
 
+    def test_from_env_reads_canonical_token_mint(self):
+        custom_mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        with patch.dict(os.environ, {
+            "SOLANA_RPC_PRIMARY_URL": "http://rpc",
+            "SOLANA_WATCHED_ADDRESSES": WATCHED_ADDR,
+            "SOLANA_TOKEN_MINT": custom_mint,
+        }):
+            cfg = IngestionConfig.from_env()
+            assert cfg.token_mint_allowlist == {custom_mint}
+
+    def test_from_env_legacy_allowlist_used_when_canonical_missing(self):
+        mint_a = "MintAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        mint_b = "MintBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        with patch.dict(os.environ, {
+            "SOLANA_RPC_PRIMARY_URL": "http://rpc",
+            "SOLANA_WATCHED_ADDRESSES": WATCHED_ADDR,
+            "SOLANA_TOKEN_MINT_ALLOWLIST": f"{mint_a},{mint_b}",
+        }):
+            cfg = IngestionConfig.from_env()
+            assert cfg.token_mint_allowlist == {mint_a, mint_b}
+
     def test_from_env_reads_caps(self):
         with patch.dict(os.environ, {
             "SOLANA_RPC_PRIMARY_URL": "http://rpc",
@@ -284,6 +327,8 @@ class TestIngestionRunBasic:
         assert result.raw_events == []
         assert result.signatures_fetched == 0
         assert result.run_status == "ok"
+        assert result.observation_state == "no_recent_activity"
+        assert result.ingestion_state == "succeeded"
 
     def test_usdc_transfer_produces_event(self, tmp_path):
         tx = _make_legacy_tx(SIG_1, usdc_amount_raw=1_000_000)
@@ -364,6 +409,17 @@ class TestWatchedMintFilter:
         assert result.raw_events[0]["signature"] == SIG_1
         assert result.transactions_skipped_no_watched_mint == 1
 
+    def test_usdc_present_without_delta_is_skipped_not_false_transfer(self, tmp_path):
+        tx = _make_legacy_tx(SIG_1, usdc_amount_raw=0)
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: [{"signature": SIG_1, "err": None}]},
+            transactions_by_sig={SIG_1: tx},
+        )
+        result = _make_adapter(rpc, tmp_path=tmp_path).run()
+        assert result.raw_events == []
+        assert result.transactions_skipped_no_watched_mint == 1
+        assert result.run_status == "ok"
+
 
 class TestFailedTransactions:
     """Failed transactions: fee counted, no transfer inclusion."""
@@ -391,7 +447,145 @@ class TestFailedTransactions:
         result = _make_adapter(rpc, tmp_path=tmp_path).run()
         assert result.transactions_degraded == 1
         assert result.run_status == "degraded"
+        assert result.ingestion_state == "failed"
         assert result.raw_events == []
+
+    def test_null_result_from_signatures_marks_failed_state(self, tmp_path):
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: []},
+            transactions_by_sig={},
+            null_signatures_for={WATCHED_ADDR},
+        )
+        result = _make_adapter(rpc, tmp_path=tmp_path).run()
+        assert result.run_status == "degraded"
+        assert result.ingestion_state == "failed"
+        assert any("null result" in e for e in result.errors)
+
+
+class TestSemanticRPCValidation:
+    """Phase 14.5 semantic RPC validation guards."""
+
+    def _checkpoint_store(self, tmp_path):
+        return CheckpointStore(str(tmp_path / "checkpoint.json"))
+
+    def _checkpoint_entry(self, store: CheckpointStore):
+        return store.get("solana", USDC_MINT, WATCHED_ADDR)
+
+    def test_json_rpc_error_field_marks_failed_and_holds_checkpoint(self, tmp_path):
+        store = self._checkpoint_store(tmp_path)
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: []},
+            signature_errors_for={WATCHED_ADDR},
+            provider_slot=900,
+        )
+        config = _make_config(start_signature=SIG_1, start_slot=900)
+        result = _make_adapter(
+            rpc, config, tmp_path=tmp_path, checkpoint_store=store
+        ).run()
+
+        assert result.run_status == "degraded"
+        assert result.ingestion_state == "failed"
+        assert any("RPC returned error" in e for e in result.errors)
+        entry = self._checkpoint_entry(store)
+        assert entry is not None
+        assert entry.last_processed_signature == SIG_1
+        assert entry.last_processed_slot == 900
+        assert entry.last_promoted_slot is None
+
+    def test_null_signature_result_marks_failed_and_holds_checkpoint(self, tmp_path):
+        store = self._checkpoint_store(tmp_path)
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: []},
+            null_signatures_for={WATCHED_ADDR},
+            provider_slot=901,
+        )
+        config = _make_config(start_signature=SIG_1, start_slot=901)
+        result = _make_adapter(
+            rpc, config, tmp_path=tmp_path, checkpoint_store=store
+        ).run()
+
+        assert result.run_status == "degraded"
+        assert result.ingestion_state == "failed"
+        assert any("null result" in e for e in result.errors)
+        entry = self._checkpoint_entry(store)
+        assert entry is not None
+        assert entry.last_processed_signature == SIG_1
+        assert entry.last_processed_slot == 901
+        assert entry.last_promoted_slot is None
+
+    def test_malformed_signature_result_marks_failed(self, tmp_path):
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: []},
+            malformed_signatures_for={WATCHED_ADDR},
+        )
+        result = _make_adapter(rpc, tmp_path=tmp_path).run()
+
+        assert result.run_status == "degraded"
+        assert result.ingestion_state == "failed"
+        assert any("malformed result" in e for e in result.errors)
+
+    def test_repeated_empty_windows_become_ambiguous_empty(self, tmp_path):
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: []},
+            transactions_by_sig={},
+        )
+        adapter = _make_adapter(rpc, tmp_path=tmp_path)
+
+        first = adapter.run()
+        second = adapter.run()
+        third = adapter.run()
+
+        assert first.observation_state == "no_recent_activity"
+        assert second.observation_state == "no_recent_activity"
+        assert third.observation_state == "ambiguous_empty"
+        assert third.run_status == "degraded"
+        assert third.ingestion_state == "provider_lagging"
+        assert any("ambiguous empty" in e for e in third.errors)
+
+    def test_provider_lag_marks_failed_and_holds_checkpoint(self, tmp_path):
+        store = self._checkpoint_store(tmp_path)
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: []},
+            provider_slot=899,
+        )
+        config = _make_config(start_signature=SIG_1, start_slot=900)
+        result = _make_adapter(
+            rpc, config, tmp_path=tmp_path, checkpoint_store=store
+        ).run()
+
+        assert result.run_status == "degraded"
+        assert result.ingestion_state == "provider_lagging"
+        assert any("provider lag detected" in e for e in result.errors)
+        entry = self._checkpoint_entry(store)
+        assert entry is not None
+        assert entry.last_processed_signature == SIG_1
+        assert entry.last_processed_slot == 900
+        assert entry.last_promoted_slot is None
+
+    def test_wrong_commitment_rejected_and_checkpoint_held(self, tmp_path):
+        store = self._checkpoint_store(tmp_path)
+        tx = _make_legacy_tx(SIG_1)
+        tx["_commitment"] = "confirmed"
+        rpc = MockRPCClient(
+            signatures_by_address={WATCHED_ADDR: [{"signature": SIG_1, "err": None}]},
+            transactions_by_sig={SIG_1: tx},
+            provider_slot=902,
+        )
+        config = _make_config(start_signature=SIG_2, start_slot=902)
+        result = _make_adapter(
+            rpc, config, tmp_path=tmp_path, checkpoint_store=store
+        ).run()
+
+        assert result.raw_events == []
+        assert result.transactions_degraded == 1
+        assert result.run_status == "degraded"
+        assert result.ingestion_state == "failed"
+        assert any("expected 'finalized'" in e for e in result.errors)
+        entry = self._checkpoint_entry(store)
+        assert entry is not None
+        assert entry.last_processed_signature == SIG_2
+        assert entry.last_processed_slot == 902
+        assert entry.last_promoted_slot is None
 
 
 class TestRunCaps:

@@ -67,6 +67,7 @@ from services.solana.event_schema import (
 
 WALLET_A = "WalletAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 WALLET_B = "WalletBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+WATCHED_ADDR = "WatchedAddr1111111111111111111111111111111111"
 ATA_A = "AtaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 ATA_B = "AtaBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
 SIG_1 = "Sig1" + "1" * 84
@@ -110,6 +111,7 @@ def _make_raw_event(
         "slot": 999_000,
         "block_time": 1_700_000_000,
         "chain": "solana",
+        "watched_address": WATCHED_ADDR,
         "pre_normalization_status": pre_normalization_status,
         "alt_resolution_status": alt_resolution_status,
         "transaction_version": "legacy",
@@ -159,6 +161,10 @@ class TestNormalizeEventCompleteness:
     def test_token_mint_preserved(self):
         event = normalize_event(_make_raw_event())
         assert event["token_mint"] == USDC_MINT
+
+    def test_watched_address_preserved(self):
+        event = normalize_event(_make_raw_event())
+        assert event["watched_address"] == WATCHED_ADDR
 
     def test_decode_version_is_string(self):
         event = normalize_event(_make_raw_event())
@@ -468,3 +474,45 @@ class TestSolanaEventWriter:
         result = writer.write_batch([normalize_event(_make_raw_event())])
         assert result.errors != []
         assert result.success is False
+
+    def test_merge_path_uses_normalized_event_id_key(self, tmp_path):
+        class _DoneJob:
+            def result(self):
+                return None
+
+        class MergeBQClient:
+            def __init__(self):
+                self.loaded = 0
+                self.queries = []
+                self.deleted = []
+
+            def load_table_from_json(self, rows, table_ref, job_config=None):
+                self.loaded += len(rows)
+                self.last_staging_table = table_ref
+                return _DoneJob()
+
+            def query(self, sql):
+                self.queries.append(sql)
+                return _DoneJob()
+
+            def delete_table(self, table_ref, not_found_ok=True):
+                self.deleted.append((table_ref, not_found_ok))
+
+        client = MergeBQClient()
+        writer = SolanaEventWriter(
+            bq_client=client,
+            dataset="solana_measured",
+            table="solana_transfers",
+            fallback_path=str(tmp_path / "buf.jsonl"),
+        )
+        events = [normalize_event(_make_raw_event())]
+        result = writer.write_batch(events)
+
+        assert result.success is True
+        assert client.loaded == 1
+        assert len(client.queries) == 1
+        sql = client.queries[0]
+        assert "MERGE `solana_measured.solana_transfers` AS target" in sql
+        assert "ON target.normalized_event_id = source.normalized_event_id" in sql
+        assert "canonical_key" not in sql
+        assert client.deleted, "Staging table should be cleaned up"

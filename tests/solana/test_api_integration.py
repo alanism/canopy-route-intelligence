@@ -90,7 +90,8 @@ class TestSolanaAPIState:
             "freshness_state", "lag_seconds", "ingestion_lag_seconds",
             "freshness_threshold_seconds", "stale_threshold_seconds",
             "last_slot", "last_block_time", "last_ingested_at",
-            "last_run_status", "last_run_at",
+            "last_run_status", "ingestion_state", "observation_state",
+            "commitment_level", "last_run_at",
             "signatures_fetched", "transactions_processed",
             "transactions_degraded", "events_written",
             "last_validation_status", "last_validation_at",
@@ -236,6 +237,40 @@ class TestSolanaCache_RecordRun:
         assert state.transactions_degraded == 2
         assert state.events_written == 16
         assert state.last_run_status == "degraded"
+        assert state.ingestion_state == "provider_lagging"
+        assert state.observation_state == "observed"
+        assert state.commitment_level == "finalized"
+
+    def test_record_run_no_events_is_no_recent_activity(self):
+        monitor, _ = _monitor()
+        cache = SolanaCache(monitor=monitor)
+        cache.record_run(
+            slot=SLOT,
+            block_time=BLOCK_TIME,
+            run_status="ok",
+            signatures_fetched=4,
+            events_written=0,
+        )
+        state = cache.get_state()
+        assert state.observation_state == "no_recent_activity"
+
+    def test_record_run_custom_state_overrides(self):
+        monitor, _ = _monitor()
+        cache = SolanaCache(monitor=monitor)
+        cache.record_run(
+            slot=SLOT,
+            block_time=BLOCK_TIME,
+            run_status="degraded",
+            commitment_level="confirmed",
+            ingestion_state="circuit_open",
+            observation_state="ambiguous_empty",
+            signatures_fetched=5,
+            events_written=0,
+        )
+        state = cache.get_state()
+        assert state.commitment_level == "confirmed"
+        assert state.ingestion_state == "circuit_open"
+        assert state.observation_state == "ambiguous_empty"
 
     def test_record_run_stores_validation_status(self):
         monitor, _ = _monitor()

@@ -115,7 +115,11 @@ def evaluate_transfer_truth(
     instruction_evidence = _find_spl_transfer_instructions(
         all_instructions, watched_mints, watched_addresses
     )
-    transfer_detected_by_instruction = instruction_evidence["found"]
+    transfer_detected_by_instruction = (
+        instruction_evidence["found"]
+        and balance_delta_detected
+        and amount_received_raw > 0
+    )
 
     # ------------------------------------------------------------------
     # Step 4: determine settlement_evidence_type
@@ -130,6 +134,12 @@ def evaluate_transfer_truth(
         settlement_evidence_type = "none"
 
     transfer_detected = balance_delta_detected or transfer_detected_by_instruction
+
+    if not transfer_detected:
+        return _no_transfer_result(
+            transaction_success=transaction_success,
+            reason="watched_mint_no_balance_delta",
+        )
 
     # ------------------------------------------------------------------
     # Step 5: apply the inclusion rule

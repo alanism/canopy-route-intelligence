@@ -34,6 +34,7 @@ def _make_event(**overrides) -> dict:
         "block_time": 1_700_000_000,
         # Token accounts
         "token_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "watched_address": "WatchedAddr1111111111111111111111111111111111",
         "source_token_account": "SRC_ATA",
         "destination_token_account": "DST_ATA",
         "source_owner": "WALLET_A",

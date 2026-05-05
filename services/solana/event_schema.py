@@ -44,7 +44,7 @@ DECODE_VERSION = "1"
 # Required field names — used for completeness validation
 REQUIRED_FIELDS: frozenset[str] = frozenset({
     "chain", "signature", "slot", "block_time",
-    "token_mint", "source_token_account", "destination_token_account",
+    "token_mint", "watched_address", "source_token_account", "destination_token_account",
     "source_owner", "destination_owner",
     "instruction_index", "inner_instruction_index", "transfer_ordinal",
     "program_id",
@@ -185,6 +185,7 @@ def normalize_event(
 
         # Token accounts (owner resolution in Phase 5)
         "token_mint": token_mint or None,
+        "watched_address": raw_event.get("watched_address"),
         "source_token_account": source_token_account or None,
         "destination_token_account": destination_token_account or None,
         "source_owner": None,           # Phase 5
@@ -272,6 +273,16 @@ def apply_owner_and_amount_resolution(
     """
     from services.solana.owner_resolver import resolve_amounts
 
+    account_keys = pre_normalized.get("account_keys_resolved") or []
+    normalized_event["source_token_account"] = _resolve_account_placeholder(
+        normalized_event.get("source_token_account"),
+        account_keys,
+    )
+    normalized_event["destination_token_account"] = _resolve_account_placeholder(
+        normalized_event.get("destination_token_account"),
+        account_keys,
+    )
+
     # --- Amount resolution ---
     amount_result = resolve_amounts(pre_normalized, decimals=decimals)
     patch = amount_result.to_dict()
@@ -317,6 +328,67 @@ def validate_normalized_event(event: dict[str, Any]) -> list[str]:
     Does not check field types — that is BigQuery's job at insert time.
     """
     return [f for f in REQUIRED_FIELDS if f not in event]
+
+
+def assign_identity_and_dedupe_batch(
+    normalized_events: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Apply deterministic identity assignment and exact-duplicate removal.
+
+    Rules:
+    - Group by raw_event_id
+    - Stable-sort each group by event_fingerprint (ascending)
+    - Assign transfer_ordinal from sorted position
+    - collision_detected=True when group has >1 distinct fingerprint
+    - normalized_event_id = "{raw_event_id}:{fingerprint[:8]}"
+    - Exact duplicates (same raw_event_id + same fingerprint) are deduped
+      before ordinal assignment
+    """
+    if not normalized_events:
+        return []
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for event in normalized_events:
+        raw_id = str(event.get("raw_event_id") or "")
+        grouped.setdefault(raw_id, []).append(event)
+
+    output: list[dict[str, Any]] = []
+    for raw_id, group in grouped.items():
+        seen_fingerprints: set[str] = set()
+        deduped_group: list[dict[str, Any]] = []
+
+        # First pass: exact duplicate replay dedupe within raw_event_id
+        for event in group:
+            fingerprint = str(event.get("event_fingerprint") or "")
+            if fingerprint in seen_fingerprints:
+                logger.info(
+                    "Deduped replayed event in batch: raw_event_id=%s fingerprint=%s",
+                    raw_id,
+                    fingerprint[:16],
+                )
+                continue
+            seen_fingerprints.add(fingerprint)
+            deduped_group.append(event)
+
+        # Deterministic ordering by fingerprint makes assignments replay-stable
+        deduped_group.sort(key=lambda e: str(e.get("event_fingerprint") or ""))
+        distinct_fingerprints = {
+            str(e.get("event_fingerprint") or "")
+            for e in deduped_group
+        }
+        collision = len(distinct_fingerprints) > 1
+
+        for ordinal, event in enumerate(deduped_group):
+            event["transfer_ordinal"] = ordinal
+            event["collision_detected"] = collision
+            event["normalized_event_id"] = _build_normalized_event_id(
+                str(event.get("raw_event_id") or ""),
+                str(event.get("event_fingerprint") or ""),
+            )
+            output.append(event)
+
+    return output
 
 
 def assert_no_float_amounts(event: dict[str, Any]) -> None:
@@ -419,3 +491,18 @@ def _build_normalized_event_id(raw_event_id: str, fingerprint: str) -> str:
     their normalized_event_ids will differ.
     """
     return f"{raw_event_id}:{fingerprint[:8]}"
+
+
+def _resolve_account_placeholder(value: Any, account_keys: list[str]) -> Any:
+    """Resolve transfer_truth account-index placeholders into pubkeys."""
+    if not isinstance(value, str):
+        return value
+    if not (value.startswith("__account_index_") and value.endswith("__")):
+        return value
+    try:
+        idx = int(value[len("__account_index_"):-2])
+    except ValueError:
+        return value
+    if 0 <= idx < len(account_keys):
+        return account_keys[idx]
+    return value

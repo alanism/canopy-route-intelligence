@@ -136,6 +136,26 @@ class SolanaRPCClient:
         raw = self._post_with_retry(url, payload, context=f"getTransaction({signature[:8]}…)")
         return raw.get("result")
 
+    def get_slot(
+        self,
+        *,
+        commitment: str = "finalized",
+        use_fallback: bool = False,
+    ) -> Optional[int]:
+        """Fetch the provider's current slot for the requested commitment."""
+        url = self._pick_url(use_fallback)
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getSlot",
+            "params": [{"commitment": commitment}],
+        }
+        raw = self._post_with_retry(url, payload, context=f"getSlot({commitment})")
+        result = raw.get("result")
+        if result is None:
+            return None
+        return int(result)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

@@ -271,8 +271,8 @@ The existing `/health` response now includes a `"Solana"` entry in its `chains` 
 | `SOLANA_STALE_THRESHOLD_SECONDS` | `3600` | Stale → unavailable transition (seconds) |
 | `SOLANA_RPC_MAX_RPS` | `10` | Rate limiter: max requests per second |
 | `SOLANA_RPC_BURST_LIMIT` | `20` | Rate limiter: burst capacity |
-| `SOLANA_CIRCUIT_MAX_FAILURES` | `5` | Circuit breaker: consecutive failure threshold |
-| `SOLANA_CIRCUIT_COOLDOWN_SECONDS` | `60` | Circuit breaker: cooldown before HALF_OPEN |
+| `SOLANA_MAX_CONSECUTIVE_FAILURES` | `5` | Circuit breaker: consecutive failure threshold |
+| `SOLANA_CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `60` | Circuit breaker: cooldown before HALF_OPEN |
 | `SOLANA_BQ_DATASET` | `solana_measured` | BigQuery dataset |
 | `SOLANA_BQ_TABLE` | `solana_transfers` | BigQuery table |
 

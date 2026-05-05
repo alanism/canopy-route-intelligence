@@ -493,6 +493,15 @@ class TestApplyOwnerAndAmountResolution:
         assert event["amount_transferred_raw"] == 1_000_000
         assert event["amount_resolution_status"] == STATUS_OK
 
+    def test_token_account_placeholders_rewritten_to_pubkeys(self, tmp_path):
+        raw, pre = self._make_raw_event(amount_received_raw=1_000_000)
+        raw["source_token_account"] = "__account_index_2__"
+        raw["destination_token_account"] = "__account_index_3__"
+        event = normalize_event(raw)
+        apply_owner_and_amount_resolution(event, pre)
+        assert event["source_token_account"] == ATA_A
+        assert event["destination_token_account"] == ATA_B
+
     def test_amount_decimal_updated_and_is_decimal(self, tmp_path):
         raw, pre = self._make_raw_event(amount_received_raw=2_500_000)
         event = normalize_event(raw)
