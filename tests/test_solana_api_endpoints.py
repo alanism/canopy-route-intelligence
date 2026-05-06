@@ -306,3 +306,14 @@ class TestDashboardRenderingRules:
                 "scope_disclaimer": disclaimer,
             }
             assert payload["scope_disclaimer"] == disclaimer
+
+
+class TestSolanaCorridorIntelligenceEndpoint:
+    def test_endpoint_is_wired_to_materialized_loader_without_bigquery(self):
+        from pathlib import Path
+
+        source = (Path(__file__).resolve().parents[1] / "api" / "main.py").read_text(encoding="utf-8")
+
+        assert '@app.get("/v1/solana/corridor-intelligence")' in source
+        assert "load_corridor_intelligence()" in source
+        assert "run_shadow_validation" not in source

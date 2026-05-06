@@ -1,14 +1,14 @@
 # Solana Build Progress — v3 Execution Tracker
 
 **Source of truth:** `docs/Canopy_PRD_BuildPlan_v3.docx`  
-**Last Updated:** 2026-05-05  
+**Last Updated:** 2026-05-06  
 **Current Mode:** Execution / Build
 
 ---
 
 ## Handoff Protocol (Mandatory)
 
-At the end of **every phase** (13, 14, 14.5, 15, 16, 16.5), the active agent must do all of the following before handoff:
+At the end of **every phase** (13, 14, 14.5, 15, 16, 16.5, 17), the active agent must do all of the following before handoff:
 
 1. Update this file (`SOLANA_BUILD_PROGRESS.md`):
 - set phase status (`Not Started` | `In Progress` | `Blocked` | `Done`)
@@ -38,15 +38,16 @@ No phase is considered complete without both docs updated.
 | 14.5 — Semantic RPC Validation | S0/S1 | `Done` | Codex | 2026-05-05 | semantic RPC guards + checkpoint-hold tests |
 | 15 — Durable Scheduler + Checkpoint Safety | S1/S2 | `Done` | Codex | 2026-05-05 | scheduler + checkpoint invariant tests |
 | 16 — Idempotent BQ Promotion + Tooling | S2 | `Done` | Codex | 2026-05-05 | DDL tooling + MERGE replay tests |
-| 16.5 — Shadow S3 Signal Validation | S3 | `Not Started` | Unassigned | 2026-05-05 | internal-only shadow views + missing_field_report |
+| 16.5 — Shadow S3 Signal Validation | S3 | `Done` | Codex | 2026-05-06 | shadow query tooling/tests + live sandbox acceptance complete |
+| 17 — Corridor Intelligence Product Layer | S3 | `Done` | Codex | 2026-05-06 | materialized API artifact; cold-start/evidence-limited state |
 
 ---
 
 ## Current Focus
 
-- **Now Working On:** none; Phase 16 closed, Phase 16.5 not started  
+- **Now Working On:** none; Phase 17 complete  
 - **Hard Blockers First:** TD-01, TD-02, TD-03, TD-04, TD-05  
-- **Phase 17:** Explicitly blocked until Phase 16 acceptance criteria pass.
+- **Phase 17:** Complete as materialized product-layer artifact and API endpoint.
 
 ---
 
@@ -122,21 +123,29 @@ Use this exact structure when closing a phase.
 
 ## Phase 16.5 Checklist (Execution)
 
-- [ ] Create internal-only `shadow_*` views
-- [ ] Compute shadow success purity / MEV protection / settlement velocity
-- [ ] Generate and review `missing_field_report`
-- [ ] Verify no shadow outputs leak to external-facing surfaces
-- [ ] Record phase closeout entry in `SOLANA_LEARNING_LOG.md`
+- [x] Create internal-only `shadow_*` queries and runner
+- [x] Implement shadow success purity / MEV protection / settlement velocity / fee efficiency SQL
+- [x] Generate and review live `shadow_missing_field_report`
+- [x] Verify no shadow outputs leak to external-facing surfaces
+- [x] Record phase closeout entry in `SOLANA_LEARNING_LOG.md`
+
+## Phase 17 Checklist (Execution)
+
+- [x] Add materialized Solana corridor intelligence artifact builder
+- [x] Add request-path-safe `/v1/solana/corridor-intelligence` endpoint
+- [x] Preserve cold-start and schema-gap gates before product-candidate state
+- [x] Materialize live sandbox artifact from Phase 16.5 shadow evidence
+- [x] Record phase closeout entry in `SOLANA_LEARNING_LOG.md`
 
 ---
 
 ## Agent Handoff Snapshot (Update Every Session)
 
-- **Completed:** Phase 13; Phase 14 finalized JSONL first slice; Phase 14.5 semantic RPC validation; Phase 15 durable scheduler + checkpoint safety; Phase 16 idempotent BQ promotion tooling
+- **Completed:** Phase 13; Phase 14 finalized JSONL first slice; Phase 14.5 semantic RPC validation; Phase 15 durable scheduler + checkpoint safety; Phase 16 idempotent BQ promotion tooling; Phase 16.5 shadow S3 validation; Phase 17 materialized corridor intelligence product layer
 - **In Progress:** none
-- **Blocked:** repo-wide pytest collection is blocked until local `.venv` installs pinned dependencies from `requirements.txt`
-- **Next Critical Step:** wait for explicit approval before starting Phase 16.5.
-- **Notes for Next Agent:** Phase 16 acceptance evidence: focused tests `100 passed`, Solana/API suite `407 passed`, BQ DDL dry run `executed=false`, replay test same batch twice -> one target row, S3-readiness `missing=[]`.
+- **Blocked:** repo-wide pytest collection is still blocked until local `.venv` installs pinned dependencies from `requirements.txt`
+- **Next Critical Step:** decide whether to commit current Phase 16.5/17 work or proceed to the next explicitly requested phase.
+- **Notes for Next Agent:** Phase 17 evidence: focused tests `49 passed`, Solana/API suite `428 passed`, materializer output `status=degraded`, `signal_state=cold_start`, `claim_level=evidence_limited`, `missing_fields=[]`.
 
 ---
 
@@ -344,3 +353,97 @@ Use this exact structure when closing a phase.
 - Next Agent TODOs:
   - Do not begin Phase 16.5 unless explicitly instructed.
   - Hydrate `.venv` from `requirements.txt`, then rerun repo-wide pytest for full EVM/API confirmation.
+
+### Phase 16.5 Closeout
+- Date: 2026-05-06
+- Owner/Agent: Codex
+- Status: `Done`
+- PRD Source Section(s): Shadow S3 Signal Validation
+- Scope Completed:
+  - Added internal-only shadow query builder with exact outputs `shadow_success_purity`, `shadow_mev_protection_rate`, `shadow_settlement_velocity`, `shadow_fee_efficiency`, `shadow_missing_field_report`.
+  - Added hard target guard for `canopy-main.solana_measured_sandbox.solana_transfers_phase16_test`.
+  - Added slot-bounded SQL generation and S3 field-aware missing-field report generation.
+  - Added `scripts/run_solana_shadow_validation.py` with gcloud-account/project reporting, exact SQL output, dry-run-before-execute behavior, and sandbox-table-only execution path through `bq`.
+  - Added focused tests for query names, slot bounds, target guard, internal-only classification, S3 field coverage, and cold-start reporting.
+  - Verified `shadow_*` references remain internal to the new module/script/tests only.
+- Files Touched:
+  - `services/solana/shadow_validation.py`
+  - `scripts/run_solana_shadow_validation.py`
+  - `tests/solana/test_shadow_validation.py`
+  - `SOLANA_BUILD_PROGRESS.md`
+  - `SOLANA_LEARNING_LOG.md`
+- Tests Run:
+  - `.venv/bin/python -m pytest -q tests/solana/test_shadow_validation.py tests/solana/test_bigquery_phase16.py`
+  - `.venv/bin/python -m pytest -q tests/solana tests/test_solana_api_endpoints.py`
+  - `.venv/bin/python scripts/run_solana_shadow_validation.py --json`
+- Acceptance Criteria:
+  - Focused Phase 16.5 tests: PASS (`22 passed`)
+  - Solana/API suite: PASS (`419 passed`)
+  - Internal-only shadow query surface: PASS
+  - Dry-run-first runner implementation: PASS
+  - Live sandbox query execution: PASS
+- Evidence (logs/queries/outputs):
+  - `gcloud config get-value core/account` -> `alan@canopysystems.xyz`
+  - `gcloud config get-value core/project` -> `canopy-main`
+  - Live runner output from `.venv/bin/python scripts/run_solana_shadow_validation.py --json`:
+    - bounds dry-run bytes `16`
+    - slot bounds `417663784..417663784`
+    - `shadow_success_purity` dry-run bytes `14`, result rows `1`, `success_purity_rate=1.0`
+    - `shadow_mev_protection_rate` dry-run bytes `79`, result rows `1`, `mev_protection_proxy_rate=1.0`
+    - `shadow_settlement_velocity` dry-run bytes `24`, result rows `1`, `avg_latency_seconds=1513.0`
+    - `shadow_fee_efficiency` dry-run bytes `72`, result rows `1`, `avg_transfer_per_lamport=94273.05146296379784500247959965736441098237`
+    - `shadow_missing_field_report` dry-run bytes `775`, result rows `29`, missing fields `[]`
+    - 7-day `shadow_success_purity` unavailable due to cold start: `true`
+- Open Risks:
+  - Repo-wide pytest collection still needs `.venv` hydration from `requirements.txt`.
+- Next Agent TODOs:
+  - Do not start Phase 17 unless explicitly instructed.
+  - If broader repo validation is needed later, hydrate `.venv` from `requirements.txt` and rerun repo-wide pytest.
+
+### Phase 17 Closeout
+- Date: 2026-05-06
+- Owner/Agent: Codex
+- Status: `Done`
+- PRD Source Section(s): Corridor Intelligence Product Layer
+- Scope Completed:
+  - Added materialized Solana corridor intelligence service that transforms Phase 16.5 shadow evidence into a request-safe product artifact.
+  - Added `scripts/materialize_solana_corridor_intelligence.py`.
+  - Added `GET /v1/solana/corridor-intelligence`, served from the materialized artifact only.
+  - Added cold-start, schema-gap, and request-path BigQuery-free gates.
+  - Added Phase 17 docs and env example entry for `SOLANA_CORRIDOR_INTELLIGENCE_PATH`.
+  - Materialized live artifact to `data/solana_corridor_intelligence.json`.
+- Files Touched:
+  - `services/solana/corridor_intelligence.py`
+  - `scripts/materialize_solana_corridor_intelligence.py`
+  - `api/main.py`
+  - `tests/solana/test_corridor_intelligence_phase17.py`
+  - `tests/test_solana_api_endpoints.py`
+  - `docs/solana-integration.md`
+  - `docs/solana-phase17-product-layer.md`
+  - `.env.example`
+  - `SOLANA_BUILD_PROGRESS.md`
+  - `SOLANA_LEARNING_LOG.md`
+- Tests Run:
+  - `.venv/bin/python -m pytest -q tests/solana/test_corridor_intelligence_phase17.py`
+  - `.venv/bin/python -m pytest -q tests/solana/test_corridor_intelligence_phase17.py tests/solana/test_shadow_validation.py tests/solana/test_bigquery_phase16.py tests/test_solana_api_endpoints.py`
+  - `.venv/bin/python -m pytest -q tests/solana tests/test_solana_api_endpoints.py`
+  - `.venv/bin/python scripts/materialize_solana_corridor_intelligence.py`
+- Acceptance Criteria:
+  - Materialized product-layer service: PASS
+  - API endpoint uses materialized artifact only: PASS
+  - Cold-start does not become production-candidate signal: PASS
+  - Live materialization from sandbox evidence: PASS
+  - Solana/API suite: PASS (`428 passed`)
+- Evidence (logs/queries/outputs):
+  - Focused Phase 17 suite -> `8 passed`
+  - Focused Phase 17/16.5/16/API suite -> `49 passed`
+  - Solana/API suite -> `428 passed, 1 warning`
+  - Materializer output: `status=degraded`, `signal_state=cold_start`, `claim_level=evidence_limited`, `missing_fields=[]`
+  - Artifact path: `data/solana_corridor_intelligence.json`
+- Open Risks:
+  - Live product signal remains evidence-limited until a longer observed window clears the seven-day cold-start gate.
+  - `source_owner`, `destination_owner`, and `watched_address` are present but null in the one-row sandbox artifact; this remains visible as null-rate findings.
+  - Repo-wide pytest collection still needs `.venv` hydration from `requirements.txt`.
+- Next Agent TODOs:
+  - Do not present the cold-start artifact as a production-ready seven-day signal.
+  - Re-materialize after a larger accepted Solana window before raising `claim_level` beyond `evidence_limited`.

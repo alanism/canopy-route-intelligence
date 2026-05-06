@@ -252,6 +252,20 @@ The `chain_health` sub-key mirrors the Polygon/Ethereum chain health structure i
 
 The existing `/health` response now includes a `"Solana"` entry in its `chains` dict alongside `"Polygon"` and `"Ethereum"`.
 
+### `GET /v1/solana/corridor-intelligence`
+
+Returns the Phase 17 materialized Solana corridor intelligence artifact. This endpoint does not run BigQuery, shadow validation, or RPC on the request path.
+
+If `data/solana_corridor_intelligence.json` has not been materialized, the endpoint returns `status="unavailable"` with `signal_state="no_materialized_artifact"`.
+
+The Phase 17 materializer is:
+
+```bash
+.venv/bin/python scripts/materialize_solana_corridor_intelligence.py
+```
+
+The first live Phase 17 artifact is intentionally `status="degraded"` and `claim_level="evidence_limited"` because the sandbox table contains a one-row cold-start window. Product consumers should treat this as evidence that the product layer is wired, not as a seven-day production signal.
+
 ---
 
 ## Environment Variables
@@ -275,6 +289,7 @@ The existing `/health` response now includes a `"Solana"` entry in its `chains` 
 | `SOLANA_CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `60` | Circuit breaker: cooldown before HALF_OPEN |
 | `SOLANA_BQ_DATASET` | `solana_measured` | BigQuery dataset |
 | `SOLANA_BQ_TABLE` | `solana_transfers` | BigQuery table |
+| `SOLANA_CORRIDOR_INTELLIGENCE_PATH` | `data/solana_corridor_intelligence.json` | Materialized Phase 17 product-layer artifact served by `/v1/solana/corridor-intelligence` |
 
 ---
 

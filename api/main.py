@@ -57,6 +57,7 @@ from api.x402 import (
 from models.response_models import ContextGraphResponseModel
 from services.corridor_config import get_config_health, load_corridor_config
 from services.solana.api_integration import get_solana_api_state
+from services.solana.corridor_intelligence import load_corridor_intelligence
 from services.context_graph import cache as context_graph_cache
 from services.context_graph.queries import SUPPORTED_TIME_RANGES
 from services.context_graph.service import build_response_payload, resolve_chain
@@ -838,6 +839,17 @@ async def solana_health():
             "configured watched sources and measured windows."
         ),
     })
+
+
+@app.get("/v1/solana/corridor-intelligence")
+async def solana_corridor_intelligence():
+    """
+    Materialized Solana corridor intelligence.
+
+    This endpoint serves the Phase 17 product-layer artifact only. It does not
+    run BigQuery or shadow validation on the request path.
+    """
+    return JSONResponse(content=load_corridor_intelligence())
 
 
 @app.get("/v1/overview")

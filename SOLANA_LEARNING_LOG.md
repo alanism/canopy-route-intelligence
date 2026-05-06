@@ -370,3 +370,85 @@ If this file is not updated, the phase is not complete.
   - Phase 16.5 remains not started. Wait for explicit approval before shadow S3 signal validation.
 - What We'd Do Differently Next Time:
   - Add a bootstrap dependency check before pytest so missing pinned packages produce one actionable setup message.
+
+### [2026-05-06] Phase 16.5 — Shadow S3 Signal Validation
+- Status: `Done`
+- Owner/Agent: Codex
+- PRD Section(s): Shadow S3 Signal Validation
+- Scope Executed:
+  - Added `services/solana/shadow_validation.py` to generate exactly five internal-only `shadow_*` query definitions with a hard guard on `canopy-main.solana_measured_sandbox.solana_transfers_phase16_test`.
+  - Added `scripts/run_solana_shadow_validation.py` to print active gcloud account/project, sandbox target, exact SQL, and dry-run bytes before execution.
+  - Implemented slot-bounded SQL for `shadow_success_purity`, `shadow_mev_protection_rate`, `shadow_settlement_velocity`, `shadow_fee_efficiency`, and `shadow_missing_field_report`.
+  - Added focused tests for query naming, sandbox guardrails, slot predicates, dev-only classification, S3 field coverage, and cold-start reporting.
+  - Verified via `rg` that `shadow_*` symbols exist only in the new Solana module/script/tests and do not appear in API/UI/public surfaces.
+- Key Decisions:
+  - Use `bq` CLI instead of Python BigQuery client for the runner so Phase 16.5 can operate with the active gcloud user even when the local `.venv` is missing `google` packages.
+  - Keep missing-field detection tied to the exact target table schema rather than dataset metadata or wildcard scans.
+  - Treat this phase as internal validation only: every query includes an explicit shadow/internal-only note and no product/dashboard claims.
+- What Broke / Traps Hit:
+  - Initial runner import path used `services.bigquery_client`, which immediately failed in `.venv` with `ModuleNotFoundError: No module named 'google'`.
+  - First `bq show` invocation used dotted `project.dataset.table` syntax instead of `project:dataset.table`.
+  - After fixing the table-reference syntax, the live run still blocked before any query because `bq` needed interactive reauthentication.
+- Fixes Applied:
+  - Switched runner execution from Python BigQuery client imports to subprocess-driven `bq` CLI calls.
+  - Normalized schema-inspection table reference to `canopy-main:solana_measured_sandbox.solana_transfers_phase16_test`.
+  - Upgraded command failure reporting so the runner surfaces the exact failing command and stderr text.
+- Validation Evidence:
+  - `.venv/bin/python -m pytest -q tests/solana/test_shadow_validation.py tests/solana/test_bigquery_phase16.py` -> `22 passed`.
+  - `.venv/bin/python -m pytest -q tests/solana tests/test_solana_api_endpoints.py` -> `419 passed, 1 warning`.
+  - `gcloud config get-value core/account` -> `alan@canopysystems.xyz`.
+  - `gcloud config get-value core/project` -> `canopy-main`.
+  - `.venv/bin/python scripts/run_solana_shadow_validation.py --json` succeeded against `canopy-main.solana_measured_sandbox.solana_transfers_phase16_test`.
+  - Live bounds query:
+    - `slot_min=417663784`
+    - `slot_max=417663784`
+    - `total_rows=1`
+    - `bounds_dry_run_bytes=16`
+  - Live shadow outputs:
+    - `shadow_success_purity`: dry-run bytes `14`, result rows `1`, `success_purity_rate=1.0`, `seven_day_unavailable_due_to_cold_start=true`
+    - `shadow_mev_protection_rate`: dry-run bytes `79`, result rows `1`, `mev_protection_proxy_rate=1.0`
+    - `shadow_settlement_velocity`: dry-run bytes `24`, result rows `1`, `avg_latency_seconds=1513.0`, `p50_latency_seconds=1513`
+    - `shadow_fee_efficiency`: dry-run bytes `72`, result rows `1`, `avg_transfer_per_lamport=94273.05146296379784500247959965736441098237`
+    - `shadow_missing_field_report`: dry-run bytes `775`, result rows `29`, `missing_fields=[]`
+- Risks Left Open:
+  - Repo-wide pytest remains blocked by local dependency drift unless `.venv` is hydrated from `requirements.txt`.
+- Next Agent Starts With:
+  - Phase 16.5 is complete. Do not start Phase 17 unless explicitly instructed.
+- What We'd Do Differently Next Time:
+  - Keep the preflight auth check, and also normalize `bq` JSON timestamp/string coercion in one utility earlier so CLI-backed validation flows do not rediscover the same parsing edge.
+
+### [2026-05-06] Phase 17 — Corridor Intelligence Product Layer
+- Status: `Done`
+- Owner/Agent: Codex
+- PRD Section(s): Corridor Intelligence Product Layer
+- Scope Executed:
+  - Added `services/solana/corridor_intelligence.py` to transform Phase 16.5 shadow evidence into a materialized product-layer payload.
+  - Added `scripts/materialize_solana_corridor_intelligence.py` to produce `data/solana_corridor_intelligence.json`.
+  - Added `GET /v1/solana/corridor-intelligence`, which serves only the materialized artifact and never runs BigQuery on the request path.
+  - Added focused tests for cold-start gating, schema-gap blocking, bad shadow report rejection, artifact round trip, materializer behavior, and endpoint wiring.
+  - Added `docs/solana-phase17-product-layer.md` and updated `docs/solana-integration.md` plus `.env.example`.
+- Key Decisions:
+  - Treat Phase 17 as a materialized product layer rather than a request-time BigQuery view.
+  - Preserve the Phase 16.5 cold-start finding as product behavior: one-row evidence becomes `status=degraded`, `signal_state=cold_start`, and `claim_level=evidence_limited`.
+  - Keep null-rate findings visible instead of hiding incomplete owner/watched-address evidence.
+- What Broke / Traps Hit:
+  - A first endpoint test imported `api/main.py` and failed because the local `.venv` still lacks `fastapi`.
+  - The fix was to match the existing Solana API tests and verify the endpoint wiring without importing FastAPI in this under-hydrated environment.
+- Fixes Applied:
+  - Added a static endpoint wiring test that confirms the route calls `load_corridor_intelligence()` and does not reference shadow validation.
+  - Added service-level tests for request-path BigQuery-free behavior through the artifact loader.
+- Validation Evidence:
+  - `.venv/bin/python -m pytest -q tests/solana/test_corridor_intelligence_phase17.py` -> `8 passed`.
+  - `.venv/bin/python -m pytest -q tests/solana/test_corridor_intelligence_phase17.py tests/solana/test_shadow_validation.py tests/solana/test_bigquery_phase16.py tests/test_solana_api_endpoints.py` -> `49 passed`.
+  - `.venv/bin/python -m pytest -q tests/solana tests/test_solana_api_endpoints.py` -> `428 passed, 1 warning`.
+  - `.venv/bin/python scripts/materialize_solana_corridor_intelligence.py` -> `status=degraded`, `signal_state=cold_start`, `claim_level=evidence_limited`, `missing_fields=[]`.
+  - Materialized artifact includes `quality_gates.request_path_bigquery_free=true`, `slot_min=417663784`, `slot_max=417663784`, and open risk for unavailable seven-day success purity.
+- Risks Left Open:
+  - The live artifact remains evidence-limited until a larger accepted Solana observation window clears the cold-start gate.
+  - The one-row sandbox artifact has null-rate findings for `source_owner`, `destination_owner`, and `watched_address`.
+  - Repo-wide pytest still needs `.venv` hydration from `requirements.txt`.
+- Next Agent Starts With:
+  - Commit or push the Phase 16.5/17 work if requested.
+  - Re-materialize Phase 17 after a larger live Solana window before treating the signal as a production candidate.
+- What We'd Do Differently Next Time:
+  - Define the separate Phase 17 PRD before implementation begins; the conservative materialized-artifact shape worked, but a written product contract would reduce interpretation risk.
