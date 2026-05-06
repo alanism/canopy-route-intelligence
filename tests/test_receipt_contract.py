@@ -18,7 +18,25 @@ def render_payroll_receipt(run_id: str = "ph-2026-04-04") -> str:
     ), patch(
         "services.payroll_demo.run_corridor_forecast",
         return_value=FakeForecastResponse(build_forecast_payload()),
-    ), patch("services.payroll_demo.get_query_metrics_snapshot", return_value=build_query_metrics()):
+    ), patch(
+        "services.payroll_demo.get_query_metrics_snapshot",
+        return_value=build_query_metrics(),
+    ), patch(
+        "services.payroll_demo.runtime_cache.get_cache",
+        return_value={
+            "status": "degraded",
+            "last_updated": "2026-03-30T15:00:00+00:00",
+        },
+    ), patch(
+        "services.payroll_demo.runtime_cache.get_refresh_state",
+        return_value={
+            "status": "idle",
+            "last_measured_refresh": "2026-03-30T14:55:00+00:00",
+        },
+    ), patch(
+        "services.payroll_demo.runtime_cache.get_cache_age_seconds",
+        return_value=900,
+    ):
         detail = payroll_demo.get_payroll_run_detail(run_id)
         return export_decision_receipt(
             corridor=detail["corridor"],

@@ -452,3 +452,31 @@ If this file is not updated, the phase is not complete.
   - Re-materialize Phase 17 after a larger live Solana window before treating the signal as a production candidate.
 - What We'd Do Differently Next Time:
   - Define the separate Phase 17 PRD before implementation begins; the conservative materialized-artifact shape worked, but a written product contract would reduce interpretation risk.
+
+### [2026-05-06] Post-Phase Stabilization — Repo-Wide Test Reliability + Dependency Closeout
+- Status: `Done`
+- Owner/Agent: Codex
+- PRD Section(s): Build-plan closeout hygiene; handoff reliability requirements
+- Scope Executed:
+  - Hydrated local `.venv` from pinned `requirements.txt` and upgraded pip so pinned BigQuery dependencies install cleanly.
+  - Fixed order-dependent receipt contract tests by pinning `runtime_cache` state in `render_payroll_receipt()` test helper.
+  - Re-ran targeted receipt tests and full repository pytest.
+  - Updated phase tracker to remove stale blockers and mark pending checklist items complete.
+- Key Decisions:
+  - Keep this as a test-layer fix only (no production logic change), because failure mode was non-deterministic fixture state leakage across tests.
+  - Treat untracked files under `data/` as runtime artifacts only and keep them out of commits unless explicitly requested.
+- What Broke / Traps Hit:
+  - Running the two receipt tests alone could pass while full-suite execution failed due shared mutable `runtime_cache` state from other tests.
+  - Initial dependency install failed on old pip when resolving `google-cloud-bigquery==3.25.0`.
+- Fixes Applied:
+  - Added deterministic patches for `runtime_cache.get_cache`, `runtime_cache.get_refresh_state`, and `runtime_cache.get_cache_age_seconds` in `tests/test_receipt_contract.py`.
+  - Upgraded pip, then reinstalled requirements into `.venv`.
+- Validation Evidence:
+  - `.venv/bin/python -m pytest -q tests/test_receipt_contract.py` -> `8 passed`.
+  - `.venv/bin/python -m pytest -q` -> `533 passed, 30 warnings`.
+- Risks Left Open:
+  - Warnings remain from statsmodels convergence and Python 3.9 deprecation notices; they do not currently fail tests but should be tracked for future runtime upgrades.
+- Next Agent Starts With:
+  - Build plan phases are complete and test suite is green; proceed only with new explicitly requested scope.
+- What We'd Do Differently Next Time:
+  - Add deterministic cache-state fixtures earlier for receipt tests to prevent latent order-dependency from surfacing late in full-suite runs.

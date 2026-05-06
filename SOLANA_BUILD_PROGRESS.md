@@ -91,8 +91,8 @@ Use this exact structure when closing a phase.
 - [x] Verify at least 3 events observed in accepted finalized batch
 - [x] `/v1/solana/health` includes `freshness_state`, `observation_state`, `ingestion_state`, `commitment_level`
 - [x] Checkpoint has valid signature + slot
-- [ ] Empty/ambiguous responses do not advance checkpoint
-- [ ] Record phase closeout entry in `SOLANA_LEARNING_LOG.md`
+- [x] Empty/ambiguous responses do not advance checkpoint
+- [x] Record phase closeout entry in `SOLANA_LEARNING_LOG.md`
 
 ## Phase 14.5 Checklist (Execution)
 
@@ -141,11 +141,11 @@ Use this exact structure when closing a phase.
 
 ## Agent Handoff Snapshot (Update Every Session)
 
-- **Completed:** Phase 13; Phase 14 finalized JSONL first slice; Phase 14.5 semantic RPC validation; Phase 15 durable scheduler + checkpoint safety; Phase 16 idempotent BQ promotion tooling; Phase 16.5 shadow S3 validation; Phase 17 materialized corridor intelligence product layer
+- **Completed:** Phase 13; Phase 14 finalized JSONL first slice; Phase 14.5 semantic RPC validation; Phase 15 durable scheduler + checkpoint safety; Phase 16 idempotent BQ promotion tooling; Phase 16.5 shadow S3 validation; Phase 17 materialized corridor intelligence product layer; repo-wide dependency hydration and deterministic receipt-contract test stabilization
 - **In Progress:** none
-- **Blocked:** repo-wide pytest collection is still blocked until local `.venv` installs pinned dependencies from `requirements.txt`
-- **Next Critical Step:** decide whether to commit current Phase 16.5/17 work or proceed to the next explicitly requested phase.
-- **Notes for Next Agent:** Phase 17 evidence: focused tests `49 passed`, Solana/API suite `428 passed`, materializer output `status=degraded`, `signal_state=cold_start`, `claim_level=evidence_limited`, `missing_fields=[]`.
+- **Blocked:** none
+- **Next Critical Step:** proceed only on explicit user direction for post-Phase-17 scope; core build plan phases are complete and test suite is green.
+- **Notes for Next Agent:** repo-wide pytest now passes (`533 passed`); keep runtime artifacts under `data/` uncommitted unless explicitly required.
 
 ---
 
