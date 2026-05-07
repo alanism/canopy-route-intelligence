@@ -986,7 +986,7 @@ def _payroll_receipt_response(run_id: str) -> PlainTextResponse:
     detail = get_payroll_run_detail(run_id)
     receipt = export_decision_receipt(
         corridor=detail["corridor"],
-        lens="Payroll Readiness",
+        lens="EoR Readiness",
         route_result=detail["route_recommendation"]["route_payload"],
         payroll_context=build_receipt_context(run_id),
     )
